@@ -18,5 +18,6 @@ passport.use(
     }
   )
 );
+console.log('CLIENT ID:', process.env.GOOGLE_CLIENT_ID);
 
 module.exports = passport;
