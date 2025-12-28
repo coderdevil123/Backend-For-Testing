@@ -13,7 +13,7 @@ router.post('/report-issue', upload.single('file'), async (req, res) => {
 
     await resend.emails.send({
       from: 'PF Reports <onboarding@resend.dev>', // works without domain
-      to: process.env.TEAM_EMAIL,
+      to: 'shubhangmishra094@gmail.com',
       subject: `🚨 New Issue Reported: ${title}`,
       reply_to: email,
       html: `
