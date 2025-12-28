@@ -1,30 +1,21 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
 const multer = require('multer');
+const { Resend } = require('resend');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 router.post('/report-issue', upload.single('file'), async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({ error: 'No form data received' });
-    }
-
     const { tool, name, email, title, description, priority } = req.body;
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.NOTIFY_EMAIL,
-        pass: process.env.NOTIFY_EMAIL_PASSWORD,
-      },
-    });
-
-    const mailOptions = {
-      from: `"Issue Reporter" <${process.env.NOTIFY_EMAIL}>`,
-      to: 'shubhang.mishra@pristineforests.com',
+    await resend.emails.send({
+      from: 'PF Reports <onboarding@resend.dev>', // works without domain
+      to: process.env.TEAM_EMAIL,
       subject: `🚨 New Issue Reported: ${title}`,
+      reply_to: email,
       html: `
         <h3>New Issue Reported</h3>
         <p><b>Tool:</b> ${tool}</p>
@@ -34,19 +25,20 @@ router.post('/report-issue', upload.single('file'), async (req, res) => {
         <p><b>Description:</b><br/>${description}</p>
       `,
       attachments: req.file
-        ? [{
-            filename: req.file.originalname,
-            content: req.file.buffer,
-          }]
+        ? [
+            {
+              filename: req.file.originalname,
+              content: req.file.buffer.toString('base64'),
+            },
+          ]
         : [],
-    };
-
-    await transporter.sendMail(mailOptions);
+    });
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Report issue error:', err);
-    res.status(500).json({ error: 'Failed to send report' });
+    console.error('Resend error:', err);
+    res.status(500).json({ error: 'Failed to send email' });
   }
 });
+
 module.exports = router;
