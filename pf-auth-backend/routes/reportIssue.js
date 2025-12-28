@@ -49,3 +49,4 @@ router.post('/report-issue', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: 'Failed to send report' });
   }
 });
+module.exports = router;
