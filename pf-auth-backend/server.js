@@ -6,13 +6,14 @@ const cors = require('cors');
 const app = express();
 const reportIssueRoute = require('./routes/reportIssue');
 
-
-app.use('/api', reportIssueRoute);
-
-
 app.use(cors({
   origin: process.env.FRONTEND_URL,
 }));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use('/api', reportIssueRoute);
 
 app.use(passport.initialize());
 
