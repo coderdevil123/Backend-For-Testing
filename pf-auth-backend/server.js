@@ -3,8 +3,12 @@ const express = require('express');
 const passport = require('./auth/google');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-
 const app = express();
+const reportIssueRoute = require('./routes/reportIssue');
+
+
+app.use('/api', reportIssueRoute);
+
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
