@@ -3,6 +3,7 @@ const express = require('express');
 const passport = require('./auth/google');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const supabase = require('./lib/supabase');
 const app = express();
 const reportIssueRoute = require('./routes/reportIssue');
 
