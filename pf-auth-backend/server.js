@@ -39,7 +39,7 @@ app.get(
           name: req.user.name,
           avatar_url: req.user.avatar_url,
         },
-        { onConflict: 'google_id' }
+        { onConflict: 'email' }
       )
       .select()
       .single();
