@@ -27,16 +27,45 @@ app.get(
 app.get(
   '/auth/google/callback',
   passport.authenticate('google', { session: false }),
-  (req, res) => {
-    const token = jwt.sign(req.user, process.env.JWT_SECRET, {
-      expiresIn: '7d',
-    });
+  async (req, res) => {
+    // 1️⃣ UPSERT PROFILE
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          google_id: req.user.google_id,
+          email: req.user.email,
+          name: req.user.name,
+          avatar_url: req.user.avatar_url,
+        },
+        { onConflict: 'google_id' }
+      )
+      .select()
+      .single();
 
+    if (error) {
+      console.error('Supabase upsert error:', error);
+      return res.status(500).send('Profile sync failed');
+    }
+
+    // 2️⃣ JWT
+    const token = jwt.sign(
+      {
+        google_id: req.user.google_id,
+        email: req.user.email,
+        name: req.user.name,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 3️⃣ REDIRECT
     res.redirect(
       `${process.env.FRONTEND_URL}/oauth/success?token=${token}`
     );
   }
 );
+
 
 app.get('/', (req, res) => {
   res.send('PF Auth Server Running');
