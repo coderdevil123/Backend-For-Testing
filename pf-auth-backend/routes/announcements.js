@@ -1,6 +1,5 @@
 import express from 'express';
-import { supabase } from '../lib/supabase.js';
-
+const { supabase } = require('../lib/supabase.js');
 const router = express.Router();
 
 // GET announcements for logged-in user
