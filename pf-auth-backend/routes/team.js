@@ -1,10 +1,10 @@
 const express = require('express');
 const { supabase } = require('../lib/supabase');
+const auth = require('../middlewares/auth');
 
 const router = express.Router();
 
-// GET all team members
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
     .select('email, name, avatar_url')

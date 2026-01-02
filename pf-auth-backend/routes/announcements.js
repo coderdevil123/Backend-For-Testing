@@ -2,9 +2,10 @@ const express = require('express');
 const { supabase } = require('../lib/supabase.js');
 const router = express.Router();
 
-// GET announcements for logged-in user
-router.get('/', async (req, res) => {
-  const userEmail = req.user.email; // from passport
+const auth = require('../middlewares/auth');
+
+router.get('/', auth, async (req, res) => {
+  const userEmail = req.user.email;
 
   const { data, error } = await supabase
     .from('announcements')
@@ -19,8 +20,7 @@ router.get('/', async (req, res) => {
   res.json(data);
 });
 
-// CREATE announcement (admin)
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
   const {
     title,
     content,
@@ -44,7 +44,8 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  res.json({ success: true });
+  res.status(201).json({ success: true });
 });
+
 
 module.exports = router;
