@@ -3,7 +3,7 @@ const express = require('express');
 const passport = require('./auth/google');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const supabase = require('./lib/supabase');
+const supabase = require('../lib/supabase');
 const app = express();
 const reportIssueRoute = require('./routes/reportIssue');
 const announcementRoutes = require('./routes/announcements');
@@ -16,10 +16,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use(passport.initialize());
 app.use('/api', reportIssueRoute);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team', teamRoutes);
-app.use(passport.initialize());
 
 app.get(
   '/auth/google',
