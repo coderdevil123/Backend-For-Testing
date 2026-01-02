@@ -7,6 +7,7 @@ const supabase = require('./lib/supabase');
 const app = express();
 const reportIssueRoute = require('./routes/reportIssue');
 const announcementRoutes = require('./routes/announcements');
+const teamRoutes = require('./routes/team');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -17,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api', reportIssueRoute);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/team', teamRoutes);
 app.use(passport.initialize());
 
 app.get(
