@@ -1,3 +1,4 @@
+import announcementRoutes from './routes/announcements.js';
 require('dotenv').config();
 const express = require('express');
 const passport = require('./auth/google');
@@ -15,7 +16,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api', reportIssueRoute);
-
+app.use('/api/announcements', announcementRoutes);
 app.use(passport.initialize());
 
 app.get(

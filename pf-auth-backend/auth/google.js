@@ -9,6 +9,13 @@ passport.use(
       callbackURL: `${process.env.BACKEND_URL}/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
+      const email = profile.emails[0].value;
+      // to check only pristineforests.com emails are allowed.
+      if (!email.endsWith('@pristineforests.com')) {
+        return done(null, false, {
+          message: 'Unauthorized email domain',
+        });
+      }
       const user = {
         google_id: profile.id,
         email: profile.emails[0].value,
