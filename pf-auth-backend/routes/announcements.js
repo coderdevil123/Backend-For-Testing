@@ -47,4 +47,4 @@ router.post('/', async (req, res) => {
   res.json({ success: true });
 });
 
-export default router;
+module.exports = router;
