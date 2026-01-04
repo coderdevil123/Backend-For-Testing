@@ -37,7 +37,8 @@ router.post('/', auth, async (req, res) => {
       category,
       recipients,
       tagged_emails: recipients === 'specific' ? taggedEmails : null,
-      created_by: req.user.email
+      created_by: req.user.email,
+      created_by_name: req.user.name,
     });
 
   if (error) {
