@@ -122,4 +122,40 @@ router.post('/:id/pin', auth, async (req, res) => {
   res.json({ pinned: true });
 });
 
+// DELETE announcement (global)
+router.delete('/:id', auth, async (req, res) => {
+  const announcementId = req.params.id;
+  const userEmail = req.user.email;
+
+  // 1️⃣ Fetch announcement
+  const { data: announcement, error: fetchError } = await supabase
+    .from('announcements')
+    .select('created_by')
+    .eq('id', announcementId)
+    .single();
+
+  if (fetchError || !announcement) {
+    return res.status(404).json({ error: 'Announcement not found' });
+  }
+
+  // 2️⃣ Authorization check
+  // Allow delete only if creator (or later: admin)
+  if (announcement.created_by !== userEmail) {
+    return res.status(403).json({ error: 'Not allowed to delete this announcement' });
+  }
+
+  // 3️⃣ Delete announcement
+  const { error: deleteError } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', announcementId);
+
+  if (deleteError) {
+    return res.status(500).json({ error: deleteError.message });
+  }
+
+  // 🔥 Pins & reads auto-deleted via CASCADE
+  res.json({ success: true });
+});
+
 module.exports = router;
