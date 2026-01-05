@@ -7,7 +7,8 @@ const auth = require('../middlewares/auth');
 router.get('/', auth, async (req, res) => {
   const userEmail = req.user.email;
 
-  const { data, error } = await supabase.rpc(
+  // 1️⃣ Get announcements with READ status
+  const { data: announcements, error } = await supabase.rpc(
     'get_announcements_with_read_status',
     { user_email: userEmail }
   );
@@ -16,7 +17,27 @@ router.get('/', auth, async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  res.json(data);
+  // 2️⃣ Get pins for this user
+  const { data: pins, error: pinError } = await supabase
+    .from('announcement_pins')
+    .select('announcement_id')
+    .eq('user_email', userEmail);
+
+  if (pinError) {
+    return res.status(500).json({ error: pinError.message });
+  }
+
+  const pinnedSet = new Set(
+    (pins || []).map(p => p.announcement_id)
+  );
+
+  // 3️⃣ Attach is_pinned per announcement
+  const enriched = (announcements || []).map(a => ({
+    ...a,
+    is_pinned: pinnedSet.has(a.id),
+  }));
+
+  res.json(enriched);
 });
 
 router.post('/', auth, async (req, res) => {
@@ -68,5 +89,37 @@ router.post('/:id/read', auth, async (req, res) => {
   res.json({ success: true });
 });
 
+// PIN / UNPIN announcement (per user)
+router.post('/:id/pin', auth, async (req, res) => {
+  const announcementId = req.params.id;
+  const userEmail = req.user.email;
+
+  // Check if already pinned
+  const { data: existing } = await supabase
+    .from('announcement_pins')
+    .select('id')
+    .eq('announcement_id', announcementId)
+    .eq('user_email', userEmail)
+    .single();
+
+  if (existing) {
+    // UNPIN
+    await supabase
+      .from('announcement_pins')
+      .delete()
+      .eq('announcement_id', announcementId)
+      .eq('user_email', userEmail);
+
+    return res.json({ pinned: false });
+  }
+
+  // PIN
+  await supabase.from('announcement_pins').insert({
+    announcement_id: announcementId,
+    user_email: userEmail,
+  });
+
+  res.json({ pinned: true });
+});
 
 module.exports = router;
