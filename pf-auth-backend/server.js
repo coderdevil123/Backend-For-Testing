@@ -45,17 +45,19 @@ app.get(
     }
 
     const { error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          google_id: req.user.google_id,
-          email: req.user.email,
-          name: req.user.name,
-          avatar_url: req.user.avatar_url,
-        },
-        { onConflict: 'email' }
-      );
-
+    .from('profiles')
+    .upsert(
+      {
+        google_id: req.user.google_id,
+        email: req.user.email,
+        name: req.user.name,
+        avatar_url: req.user.avatar_url || null,
+        role: 'Member',
+        department: 'General',
+      },
+      { onConflict: 'email' }
+    );
+    
     if (error) {
       console.error('Supabase upsert error:', error);
       return res.status(500).send('Profile sync failed');
