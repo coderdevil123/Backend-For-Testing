@@ -44,24 +44,37 @@ app.get(
       return res.status(401).send('Unauthorized');
     }
 
-    const { error } = await supabase
+    // Check if profile already exists
+  const { data: existingProfile } = await supabase
     .from('profiles')
-    .upsert(
-      {
-        google_id: req.user.google_id,
-        email: req.user.email,
-        name: req.user.name,
-        avatar_url: req.user.avatar_url || null,
-        role: 'Member',
-        department: 'General',
-      },
-      { onConflict: 'email' }
-    );
-    
+    .select('avatar_url')
+    .eq('email', req.user.email)
+    .maybeSingle();
+
+    // payload
+    const payload = {
+      google_id: req.user.google_id,
+      email: req.user.email,
+      name: req.user.name,
+      role: 'Member',
+      department: 'General',
+    };
+
+    // Only set avatar_url IF it does NOT exist yet
+    if (!existingProfile?.avatar_url) {
+      payload.avatar_url = req.user.avatar_url || null;
+    }
+
+    // Upsert safely
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(payload, { onConflict: 'email' });
+
     if (error) {
       console.error('Supabase upsert error:', error);
       return res.status(500).send('Profile sync failed');
     }
+
 
     const token = jwt.sign(
       {
