@@ -16,11 +16,10 @@ app.use(cors({
 }));
 app.use(passport.initialize());
 
-app.use('/api/profile', profileRoutes);
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use('/api/profile', profileRoutes);
 app.use('/api', reportIssueRoute);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team', teamRoutes);

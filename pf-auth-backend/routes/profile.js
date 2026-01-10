@@ -35,7 +35,8 @@ router.get('/', requireAuth, async (req, res) => {
 /* ✅ UPDATE profile */
 router.put('/', requireAuth, async (req, res) => {
   const { email } = req.user;
-  const { name, phone, bio, location, avatar_url } = req.body;
+  const body = req.body || {};
+  const { name, phone, bio, location, avatar_url } = body;
 
   const { error } = await supabase
     .from('profiles')
