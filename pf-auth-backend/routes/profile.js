@@ -50,7 +50,16 @@ router.put('/', requireAuth, async (req, res) => {
     .eq('email', email);
 
   if (error) return res.status(500).json(error);
-  res.json({ success: true });
+    const { data: updatedProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .single();
+
+    if (fetchError) return res.status(500).json(fetchError);
+
+    res.json(updatedProfile);
+
 });
 
 router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
