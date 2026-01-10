@@ -14,15 +14,16 @@ app.use(cors({
   origin: process.env.FRONTEND_URL,
   credentials: true,
 }));
+app.use(passport.initialize());
+
+app.use('/api/profile', profileRoutes);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(passport.initialize());
 app.use('/api', reportIssueRoute);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team', teamRoutes);
-app.use('/api/profile', profileRoutes);
 
 app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
