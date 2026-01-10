@@ -1,7 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../lib/supabase');
-
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
 
 /* 🔐 Middleware */
@@ -51,33 +52,38 @@ router.put('/', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/avatar', requireAuth, async (req, res) => {
-  const { email } = req.user;
-  const file = req.files?.avatar;
+router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+    const { email } = req.user;
+    const file = req.file;
 
-  if (!file) return res.status(400).json({ error: 'No file' });
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-  const ext = file.name.split('.').pop();
-  const path = `${email}.${ext}`;
+    const ext = file.originalname.split('.').pop();
+    const path = `avatars/${email}.${ext}`;
 
-  const { error } = await supabase.storage
-    .from('avatars')
-    .upload(path, file.data, { upsert: true });
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
 
-  if (error) return res.status(500).json(error);
+    if (error) return res.status(500).json(error);
 
-  const { data } = supabase.storage
-    .from('avatars')
-    .getPublicUrl(path);
+    const { data } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(path);
 
-  // 🔒 Persist avatar URL
-  await supabase
-    .from('profiles')
-    .update({ avatar_url: data.publicUrl })
-    .eq('email', email);
+    await supabase
+      .from('profiles')
+      .update({ avatar_url: data.publicUrl })
+      .eq('email', email);
 
-  res.json({ avatar_url: data.publicUrl });
-});
+    res.json({ avatar_url: data.publicUrl });
+  }
+);
 
 
 module.exports = router;
