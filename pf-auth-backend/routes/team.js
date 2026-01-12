@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/', auth, async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select(`email,name,avatar_url,bio,phone,role,department`)
+    .select(`email,name,avatar_url,bio,phone,mattermost,role,department`)
     .order('name');
 
   if (error) {

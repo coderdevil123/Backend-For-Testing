@@ -36,7 +36,7 @@ router.get('/', requireAuth, async (req, res) => {
 router.put('/', requireAuth, async (req, res) => {
   const { email } = req.user;
   const body = req.body || {};
-  const { name, phone, bio, location, avatar_url } = body;
+  const { name, phone, bio, location, avatar_url, mattermost } = body;
 
   const { error } = await supabase
     .from('profiles')
@@ -46,6 +46,7 @@ router.put('/', requireAuth, async (req, res) => {
       bio,
       location,
       avatar_url,
+      mattermost,
     })
     .eq('email', email);
 
