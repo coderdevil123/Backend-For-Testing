@@ -9,6 +9,7 @@ const reportIssueRoute = require('./routes/reportIssue');
 const announcementRoutes = require('./routes/announcements');
 const teamRoutes = require('./routes/team');
 const profileRoutes = require('./routes/profile');
+const toolsRoutes = require('./routes/tools');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -23,6 +24,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api', reportIssueRoute);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/tools', toolsRoutes);
 
 app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
