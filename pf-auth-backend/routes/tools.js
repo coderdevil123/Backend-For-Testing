@@ -62,4 +62,47 @@ router.post('/', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+router.put('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    description,
+    url,
+    tutorial_video,
+    category,
+    image,
+    image_light,
+    image_dark,
+  } = req.body;
+
+  const { error } = await supabase
+    .from('tools')
+    .update({
+      name,
+      description,
+      url,
+      tutorial_video,
+      category,
+      image,
+      image_light,
+      image_dark,
+    })
+    .eq('id', id);
+
+  if (error) return res.status(500).json(error);
+  res.json({ success: true });
+});
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('tools')
+    .delete()
+    .eq('id', id);
+
+  if (error) return res.status(500).json(error);
+  res.json({ success: true });
+});
+
 module.exports = router;
