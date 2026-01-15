@@ -87,8 +87,7 @@ router.post(
   }
 );
 
-
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, upload.single('image'), async (req, res) => {
   const { id } = req.params;
   const {
     name,
@@ -96,26 +95,51 @@ router.put('/:id', requireAuth, async (req, res) => {
     url,
     tutorial_video,
     category,
-    image,
-    image_light,
-    image_dark,
   } = req.body;
+
+  let imageUrl = null;
+
+  if (req.file) {
+    const filePath = `tools/${Date.now()}-${req.file.originalname}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('tool-images')
+      .upload(filePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return res.status(500).json(uploadError);
+    }
+
+    imageUrl = supabase.storage
+      .from('tool-images')
+      .getPublicUrl(filePath).data.publicUrl;
+  }
+
+  const updatePayload = {
+    name,
+    description,
+    url,
+    tutorial_video,
+    category,
+  };
+
+  // only overwrite image if a new one is uploaded
+  if (imageUrl) {
+    updatePayload.image = imageUrl;
+    updatePayload.image_light = imageUrl;
+    updatePayload.image_dark = imageUrl;
+  }
 
   const { error } = await supabase
     .from('tools')
-    .update({
-      name,
-      description,
-      url,
-      tutorial_video,
-      category,
-      image,
-      image_light,
-      image_dark,
-    })
+    .update(updatePayload)
     .eq('id', id);
 
   if (error) return res.status(500).json(error);
+
   res.json({ success: true });
 });
 
