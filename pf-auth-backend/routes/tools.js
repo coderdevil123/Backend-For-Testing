@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { supabase } = require('../lib/supabase');
 
 const router = express.Router();
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 
 /* 🔐 Auth middleware */
 function requireAuth(req, res, next) {
@@ -29,38 +31,62 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /* ✅ ADD tool */
-router.post('/', requireAuth, async (req, res) => {
-  const {
-    name,
-    url,
-    tutorial_video,
-    category,
-    image,
-    image_light,
-    image_dark,
-  } = req.body;
+router.post(
+  '/',
+  requireAuth,
+  upload.single('image'),
+  async (req, res) => {
+    const {
+      name,
+      description,
+      url,
+      category,
+      tutorial_video,
+    } = req.body;
 
-  if (!name || !url || !category) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    if (!name || !url || !category) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    let imageUrl = null;
+
+    if (req.file) {
+      const filePath = `tools/${Date.now()}-${req.file.originalname}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('tool-images')
+        .upload(filePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        return res.status(500).json(uploadError);
+      }
+
+      imageUrl = supabase.storage
+        .from('tool-images')
+        .getPublicUrl(filePath).data.publicUrl;
+    }
+
+    const { error } = await supabase.from('tools').insert({
+      name,
+      description,
+      url,
+      category,
+      tutorial_video,
+      image: imageUrl,
+      image_light: imageUrl,
+      image_dark: imageUrl,
+      created_by: req.user.email,
+    });
+
+    if (error) return res.status(500).json(error);
+
+    res.json({ success: true });
   }
+);
 
-  const { error } = await supabase.from('tools').insert({
-    name,
-    url,
-    tutorial_video,
-    category,
-    description: '',
-    rating: 0,
-    users: 0,
-    image,
-    image_light,
-    image_dark,
-    created_by: req.user.email,
-  });
-
-  if (error) return res.status(500).json(error);
-  res.json({ success: true });
-});
 
 router.put('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
