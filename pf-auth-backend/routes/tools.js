@@ -20,7 +20,7 @@ function requireAuth(req, res, next) {
 }
 
 /* ✅ GET all tools */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   const { data, error } = await supabase
     .from('tools')
     .select('*')
