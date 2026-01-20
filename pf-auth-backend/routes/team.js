@@ -17,4 +17,17 @@ router.get('/', auth, async (req, res) => {
   res.json(data);
 });
 
+router.get('/public', async (req, res) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`email,name,avatar_url,bio,phone,mattermost,role,department`)
+    .order('name');
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
 module.exports = router;
