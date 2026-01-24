@@ -11,6 +11,8 @@ const teamRoutes = require('./routes/team');
 const profileRoutes = require('./routes/profile');
 const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
+const cron = require('node-cron');
+const { runMattermostReader } = require('./services/mattermostReader');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -105,4 +107,9 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Auth server running on port ${PORT}`);
+});
+
+cron.schedule('* * * * *', async () => {
+  console.log('🔄 Checking Mattermost DMs...');
+  await runMattermostReader();
 });
