@@ -1,12 +1,7 @@
-const axios = require('axios');
 const { supabase } = require('../lib/supabase');
 
 const BASE_URL = process.env.MATTERMOST_BASE_URL;
 const BOT_TOKEN = process.env.MATTERMOST_BOT_TOKEN;
-
-const headers = {
-  Authorization: `Bearer ${BOT_TOKEN}`,
-};
 
 const STATUS_MAP = {
   PENDING: 'pending',
@@ -18,44 +13,65 @@ const STATUS_MAP = {
 };
 
 /**
- * Fetch DM channels for the bot
+ * Generic Mattermost fetch using bot token
  */
-async function getDMChannels() {
-  const res = await axios.get(
-    `${BASE_URL}/api/v4/users/me/channels`,
-    { headers }
-  );
+async function mmFetch(url) {
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${BOT_TOKEN}`,
+    },
+  });
 
-  return res.data.filter(c => c.type === 'D');
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mattermost API error ${res.status}: ${text}`);
+  }
+
+  return res.json();
 }
 
 /**
- * Process new posts in a channel
+ * Fetch DM channels for the bot
+ */
+async function getDMChannels() {
+  const channels = await mmFetch(
+    `${BASE_URL}/api/v4/users/me/channels`
+  );
+
+  // DM channels have type === 'D'
+  return channels.filter(c => c.type === 'D');
+}
+
+/**
+ * Process new posts in a DM channel
  */
 async function processChannel(channel) {
-  // Get cursor
+  // Get cursor for this channel
   const { data: cursor } = await supabase
     .from('mattermost_cursors')
     .select('*')
     .eq('channel_id', channel.id)
-    .single();
+    .maybeSingle();
 
-  const since = cursor?.last_post_id;
+  const lastPostId = cursor?.last_post_id;
 
-  const res = await axios.get(
-    `${BASE_URL}/api/v4/channels/${channel.id}/posts`,
-    { headers }
+  // Fetch posts for this channel
+  const data = await mmFetch(
+    `${BASE_URL}/api/v4/channels/${channel.id}/posts`
   );
 
-  const posts = Object.values(res.data.posts)
+  // Mattermost returns posts as object map
+  const posts = Object.values(data.posts)
     .sort((a, b) => a.create_at - b.create_at);
 
   for (const post of posts) {
-    if (since && post.id <= since) continue;
+    // Skip already processed posts
+    if (lastPostId && post.id <= lastPostId) continue;
 
-    const text = post.message || '';
+    const text = (post.message || '').trim();
 
-    // TASK format
+    // Expected DM task format:
+    // @user@pristineforests.com [STATUS] Task title
     const match = text.match(
       /@([\w.+-]+@[\w.-]+)\s+\[(PENDING|IN-PROGRESS|COMPLETED|WRONG|BLOCKED|ON-HOLD)\]\s+(.+)/i
     );
@@ -78,9 +94,10 @@ async function processChannel(channel) {
       });
 
     if (error && error.code !== '23505') {
-      console.error('Task insert error:', error);
+      console.error('❌ Task insert error:', error);
     }
 
+    // Audit event (best effort)
     await supabase.from('task_events').insert({
       event_type: 'created',
       new_status: status,
@@ -91,13 +108,13 @@ async function processChannel(channel) {
 
   // Update cursor
   if (posts.length > 0) {
-    const last = posts[posts.length - 1].id;
+    const lastProcessedId = posts[posts.length - 1].id;
 
     await supabase
       .from('mattermost_cursors')
       .upsert({
         channel_id: channel.id,
-        last_post_id: last,
+        last_post_id: lastProcessedId,
       });
   }
 }
@@ -107,12 +124,14 @@ async function processChannel(channel) {
  */
 async function runMattermostReader() {
   try {
+    console.log('🔄 Checking Mattermost DMs...');
     const channels = await getDMChannels();
+
     for (const channel of channels) {
       await processChannel(channel);
     }
   } catch (err) {
-    console.error('Mattermost reader error:', err.message);
+    console.error('🔥 Mattermost reader error:', err.message);
   }
 }
 
