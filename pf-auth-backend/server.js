@@ -11,7 +11,6 @@ const teamRoutes = require('./routes/team');
 const profileRoutes = require('./routes/profile');
 const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
-const mattermostWebhook = require('./routes/mattermostWebhook.js');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -28,7 +27,6 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/tasks', tasksRoutes);
-app.use('/api/mattermost', mattermostWebhook);
 
 app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
