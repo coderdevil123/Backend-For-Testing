@@ -40,7 +40,10 @@ function extractActionItems(text) {
   console.log('🔍 FULL TEXT LENGTH:', text.length);
   
   // Find "Your Action Items" section
-  const actionMatch = text.match(/✅ Your Action Items([\s\S]*?)(?=⚙️|💬|$)/);
+  const actionMatch = text.match(
+    /(✅\s*)?Your Action Items([\s\S]*?)(?=⚙️|💬|➡️|$)/i
+  );
+
   if (!actionMatch) {
     console.log('❌ Could not find "✅ Your Action Items" section');
     return [];
