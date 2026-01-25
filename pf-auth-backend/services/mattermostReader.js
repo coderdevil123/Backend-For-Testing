@@ -53,7 +53,7 @@ async function processChannel(channel) {
     .eq('channel_id', channel.id)
     .maybeSingle();
 
-  const lastPostId = cursor?.last_post_id;
+  const lastCreateAt = cursor?.last_create_at || 0;
 
   // Fetch posts for this channel
   const data = await mmFetch(
@@ -66,7 +66,7 @@ async function processChannel(channel) {
 
   for (const post of posts) {
     // Skip already processed posts
-    if (lastPostId && post.id <= lastPostId) continue;
+    if (post.create_at <= lastCreateAt) continue;
 
     const text = (post.message || '').trim();
 
@@ -96,6 +96,9 @@ async function processChannel(channel) {
     if (error && error.code !== '23505') {
       console.error('❌ Task insert error:', error);
     }
+    if (!error) {
+      console.log('✅ Task created:', title);
+    }
 
     // Audit event (best effort)
     await supabase.from('task_events').insert({
@@ -108,13 +111,13 @@ async function processChannel(channel) {
 
   // Update cursor
   if (posts.length > 0) {
-    const lastProcessedId = posts[posts.length - 1].id;
+    const newestCreateAt = posts[posts.length - 1].create_at;
 
     await supabase
       .from('mattermost_cursors')
       .upsert({
         channel_id: channel.id,
-        last_post_id: lastProcessedId,
+        last_create_at: newestCreateAt,
       });
   }
 }
@@ -122,6 +125,12 @@ async function processChannel(channel) {
 /**
  * Main runner
  */
+
+  if (!BOT_TOKEN || !BASE_URL) {
+    console.error('❌ Mattermost env vars missing');
+    return;
+  }
+
 async function runMattermostReader() {
   try {
     console.log('🔄 Checking Mattermost DMs...');
@@ -133,6 +142,13 @@ async function runMattermostReader() {
   } catch (err) {
     console.error('🔥 Mattermost reader error:', err.message);
   }
+  console.log(
+    '📬 DM channels found:',
+    channels.map(c => ({
+      id: c.id,
+      name: c.display_name || c.name || '(dm)',
+    }))
+  );
 }
 
 module.exports = {
