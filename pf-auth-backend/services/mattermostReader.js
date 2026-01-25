@@ -37,32 +37,48 @@ async function getDMChannels() {
 }
 
 function extractActionItems(text) {
-  // 1️⃣ Find "Your Action Items" section
-  const split = text.split('✅ Your Action Items');
-  if (split.length < 2) return [];
+  console.log('🔍 FULL TEXT LENGTH:', text.length);
+  
+  // Find "Your Action Items" section
+  const actionMatch = text.match(/✅ Your Action Items([\s\S]*?)(?=⚙️|💬|$)/);
+  if (!actionMatch) {
+    console.log('❌ Could not find "✅ Your Action Items" section');
+    return [];
+  }
 
-  const actionBlock = split[1];
-
+  const actionBlock = actionMatch[1];
+  console.log('📦 Action block length:', actionBlock.length);
+  
   const items = [];
 
-  // 2️⃣ High priority
-  const high = actionBlock.split('🔴 High Priority')[1]?.split('🟡 Medium Priority')[0];
-  if (high) {
-    const matches = high.match(/🔴\s+(.*?)(?:\n|$)/g) || [];
-    matches.forEach(m =>
-      items.push({ title: m.replace('🔴', '').trim(), priority: 'high' })
-    );
+  // High priority items
+  const highMatch = actionBlock.match(/🔴 High Priority([\s\S]*?)(?=🟡|$)/);
+  if (highMatch) {
+    const highSection = highMatch[1];
+    // Match lines starting with 🔴
+    const lines = highSection.split('\n').filter(l => l.trim().startsWith('🔴'));
+    lines.forEach(line => {
+      const title = line.replace(/🔴/g, '').split('📅')[0].trim();
+      if (title) {
+        items.push({ title, priority: 'high' });
+      }
+    });
   }
 
-  // 3️⃣ Medium priority
-  const medium = actionBlock.split('🟡 Medium Priority')[1];
-  if (medium) {
-    const matches = medium.match(/🟡\s+(.*?)(?:\n|$)/g) || [];
-    matches.forEach(m =>
-      items.push({ title: m.replace('🟡', '').trim(), priority: 'medium' })
-    );
+  // Medium priority items
+  const mediumMatch = actionBlock.match(/🟡 Medium Priority([\s\S]*?)(?=⚙️|💬|$)/);
+  if (mediumMatch) {
+    const mediumSection = mediumMatch[1];
+    const lines = mediumSection.split('\n').filter(l => l.trim().startsWith('🟡'));
+    lines.forEach(line => {
+      const title = line.replace(/🟡/g, '').split('📅')[0].trim();
+      if (title) {
+        items.push({ title, priority: 'medium' });
+      }
+    });
   }
 
+  console.log('📋 Extracted items:', items);
   return items;
 }
 
