@@ -36,6 +36,36 @@ async function getDMChannels() {
   return channels.filter(c => c.type === 'D');
 }
 
+function extractActionItems(text) {
+  // 1️⃣ Find "Your Action Items" section
+  const split = text.split('✅ Your Action Items');
+  if (split.length < 2) return [];
+
+  const actionBlock = split[1];
+
+  const items = [];
+
+  // 2️⃣ High priority
+  const high = actionBlock.split('🔴 High Priority')[1]?.split('🟡 Medium Priority')[0];
+  if (high) {
+    const matches = high.match(/🔴\s+(.*?)(?:\n|$)/g) || [];
+    matches.forEach(m =>
+      items.push({ title: m.replace('🔴', '').trim(), priority: 'high' })
+    );
+  }
+
+  // 3️⃣ Medium priority
+  const medium = actionBlock.split('🟡 Medium Priority')[1];
+  if (medium) {
+    const matches = medium.match(/🟡\s+(.*?)(?:\n|$)/g) || [];
+    matches.forEach(m =>
+      items.push({ title: m.replace('🟡', '').trim(), priority: 'medium' })
+    );
+  }
+
+  return items;
+}
+
 async function processChannel(channel) {
   // Get cursor for this channel
   const { data: cursor } = await supabase
@@ -61,14 +91,36 @@ async function processChannel(channel) {
     const text = (post.message || '').trim();
     console.log('📩 RAW DM TEXT:', text);
 
-    const match = text.match(
-      /(?:@)?([\w.+-]+@[\w.-]+).*?\[(PENDING|IN-PROGRESS|COMPLETED|WRONG|BLOCKED|ON-HOLD)\]\s+(.+)/i
-    );
+    if (post.user_username !== 'pf-taskbot') continue;
 
-    if (!match) continue;
+    // Extract action items
+    const items = extractActionItems(text);
+    if (items.length === 0) continue;
 
-    const [, email, rawStatus, title] = match;
-    const status = STATUS_MAP[rawStatus.toUpperCase()];
+    // Infer assignee from greeting
+    const emailMatch = text.match(/Hi\s+([^\s]+)\s+[^\n]*\n/i);
+    const assignedEmail = post.props?.from_email || null;
+
+    // Fallback: use DM participant email
+    const email = assignedEmail || post.props?.override_username;
+
+    for (const item of items) {
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          mattermost_post_id: post.id + ':' + item.title, // unique per task
+          title: item.title,
+          assigned_to_email: email,
+          status: 'pending',
+          source: 'mattermost',
+          created_at: new Date(post.create_at),
+        });
+
+      if (!error) {
+        console.log('✅ Task created:', item.title);
+      }
+    }
+
 
     // Insert task (idempotent)
     const { error } = await supabase
