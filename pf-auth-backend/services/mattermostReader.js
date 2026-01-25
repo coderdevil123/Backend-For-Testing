@@ -38,47 +38,47 @@ async function getDMChannels() {
 
 function extractActionItems(text) {
   console.log('🔍 FULL TEXT LENGTH:', text.length);
-  
-  // Find "Your Action Items" section
-  const actionMatch = text.match(
-    /(✅\s*)?Your Action Items([\s\S]*?)(?=⚙️|💬|➡️|$)/i
+
+  // Normalize text (remove markdown noise)
+  const cleanText = text.replace(/\*\*|__/g, '');
+
+  // Match Action Items section (robust)
+  const actionMatch = cleanText.match(
+    /(Your Action Items(?:\s*&\s*Key Updates)?)([\s\S]*?)(?=⚙️|💬|➡️|$)/i
   );
 
   if (!actionMatch) {
-    console.log('❌ Could not find "✅ Your Action Items" section');
+    console.log('❌ Could not find Action Items section');
     return [];
   }
 
-  const actionBlock = actionMatch[1];
+  const actionBlock = actionMatch[2];
   console.log('📦 Action block length:', actionBlock.length);
-  
+
   const items = [];
 
-  // High priority items
-  const highMatch = actionBlock.match(/🔴 High Priority([\s\S]*?)(?=🟡|$)/);
+  // High priority
+  const highMatch = actionBlock.match(/High Priority([\s\S]*?)(?=Medium Priority|$)/i);
   if (highMatch) {
-    const highSection = highMatch[1];
-    // Match lines starting with 🔴
-    const lines = highSection.split('\n').filter(l => l.trim().startsWith('🔴'));
-    lines.forEach(line => {
-      const title = line.replace(/🔴/g, '').split('📅')[0].trim();
-      if (title) {
-        items.push({ title, priority: 'high' });
-      }
-    });
+    highMatch[1]
+      .split('\n')
+      .filter(l => l.includes('🔴'))
+      .forEach(line => {
+        const title = line.replace(/🔴/g, '').split('📅')[0].trim();
+        if (title) items.push({ title, priority: 'high' });
+      });
   }
 
-  // Medium priority items
-  const mediumMatch = actionBlock.match(/🟡 Medium Priority([\s\S]*?)(?=⚙️|💬|$)/);
+  // Medium priority
+  const mediumMatch = actionBlock.match(/Medium Priority([\s\S]*?)(?=⚙️|💬|$)/i);
   if (mediumMatch) {
-    const mediumSection = mediumMatch[1];
-    const lines = mediumSection.split('\n').filter(l => l.trim().startsWith('🟡'));
-    lines.forEach(line => {
-      const title = line.replace(/🟡/g, '').split('📅')[0].trim();
-      if (title) {
-        items.push({ title, priority: 'medium' });
-      }
-    });
+    mediumMatch[1]
+      .split('\n')
+      .filter(l => l.includes('🟡'))
+      .forEach(line => {
+        const title = line.replace(/🟡/g, '').split('📅')[0].trim();
+        if (title) items.push({ title, priority: 'medium' });
+      });
   }
 
   console.log('📋 Extracted items:', items);
@@ -130,8 +130,12 @@ async function processChannel(channel) {
     const members = await mmFetch(
       `${BASE_URL}/api/v4/channels/${channel.id}/members`
     );
+    const BACKEND_BOT_USER_ID = process.env.MATTERMOST_BACKEND_BOT_USER_ID;
+
     const userMember = members.find(
-      m => m.user_id !== TASKBOT_USER_ID // exclude pf-taskbot
+      m =>
+        m.user_id !== TASKBOT_USER_ID &&
+        m.user_id !== BACKEND_BOT_USER_ID
     );
     
     if (!userMember) {
