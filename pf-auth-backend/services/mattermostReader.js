@@ -134,22 +134,28 @@ async function processChannel(channel) {
 async function runMattermostReader() {
   try {
     console.log('🔄 Checking Mattermost DMs...');
+
+    // ✅ FIRST declare channels
     const channels = await getDMChannels();
 
+    // ✅ THEN log them
+    console.log(
+      '📬 DM channels found:',
+      channels.map(c => ({
+        id: c.id,
+        name: c.display_name || c.name || '(dm)',
+      }))
+    );
+
+    // ✅ THEN process
     for (const channel of channels) {
       await processChannel(channel);
     }
   } catch (err) {
     console.error('🔥 Mattermost reader error:', err.message);
   }
-  console.log(
-    '📬 DM channels found:',
-    channels.map(c => ({
-      id: c.id,
-      name: c.display_name || c.name || '(dm)',
-    }))
-  );
 }
+
 
 module.exports = {
   runMattermostReader,
