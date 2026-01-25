@@ -12,9 +12,6 @@ const STATUS_MAP = {
   'ON-HOLD': 'on-hold',
 };
 
-/**
- * Generic Mattermost fetch using bot token
- */
 async function mmFetch(url) {
   const res = await fetch(url, {
     headers: {
@@ -30,9 +27,6 @@ async function mmFetch(url) {
   return res.json();
 }
 
-/**
- * Fetch DM channels for the bot
- */
 async function getDMChannels() {
   const channels = await mmFetch(
     `${BASE_URL}/api/v4/users/me/channels`
@@ -42,9 +36,6 @@ async function getDMChannels() {
   return channels.filter(c => c.type === 'D');
 }
 
-/**
- * Process new posts in a DM channel
- */
 async function processChannel(channel) {
   // Get cursor for this channel
   const { data: cursor } = await supabase
@@ -65,13 +56,10 @@ async function processChannel(channel) {
     .sort((a, b) => a.create_at - b.create_at);
 
   for (const post of posts) {
-    // Skip already processed posts
     if (post.create_at <= lastCreateAt) continue;
 
     const text = (post.message || '').trim();
 
-    // Expected DM task format:
-    // @user@pristineforests.com [STATUS] Task title
     const match = text.match(
       /@([\w.+-]+@[\w.-]+)\s+\[(PENDING|IN-PROGRESS|COMPLETED|WRONG|BLOCKED|ON-HOLD)\]\s+(.+)/i
     );
@@ -122,23 +110,15 @@ async function processChannel(channel) {
   }
 }
 
-/**
- * Main runner
- */
-
-  if (!BOT_TOKEN || !BASE_URL) {
+async function runMattermostReader() {
+  try {
+    if (!BOT_TOKEN || !BASE_URL) {
     console.error('❌ Mattermost env vars missing');
     return;
   }
-
-async function runMattermostReader() {
-  try {
     console.log('🔄 Checking Mattermost DMs...');
-
-    // ✅ FIRST declare channels
     const channels = await getDMChannels();
 
-    // ✅ THEN log them
     console.log(
       '📬 DM channels found:',
       channels.map(c => ({
@@ -147,7 +127,6 @@ async function runMattermostReader() {
       }))
     );
 
-    // ✅ THEN process
     for (const channel of channels) {
       await processChannel(channel);
     }
