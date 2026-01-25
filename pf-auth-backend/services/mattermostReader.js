@@ -67,98 +67,78 @@ function extractActionItems(text) {
 }
 
 async function processChannel(channel) {
-  // Get cursor for this channel
+  // 1️⃣ Cursor
   const { data: cursor } = await supabase
-  .from('mattermost_cursors')
-  .select('*')
-  .eq('channel_id', channel.id)
-  .maybeSingle();
-  
+    .from('mattermost_cursors')
+    .select('*')
+    .eq('channel_id', channel.id)
+    .maybeSingle();
+
   const lastCreateAt = cursor?.last_create_at || 0;
-  
-  // Fetch posts for this channel
+
+  // 2️⃣ Fetch posts
   const data = await mmFetch(
     `${BASE_URL}/api/v4/channels/${channel.id}/posts`
   );
-  
-  // Mattermost returns posts as object map
+
   const posts = Object.values(data.posts)
-  .sort((a, b) => a.create_at - b.create_at);
-  
+    .sort((a, b) => a.create_at - b.create_at);
+
   for (const post of posts) {
     if (post.create_at <= lastCreateAt) continue;
-    
+
+    // ✅ Only messages sent by pf-taskbot
+    if (post.user_username !== 'pf-taskbot') continue;
+
     const text = (post.message || '').trim();
     console.log('📩 RAW DM TEXT:', text);
 
-    if (post.user_username !== 'pf-taskbot') continue;
-
-    // Extract action items
+    // 3️⃣ Extract action items
     const items = extractActionItems(text);
     if (items.length === 0) continue;
 
-    // Infer assignee from greeting
-    const emailMatch = text.match(/Hi\s+([^\s]+)\s+[^\n]*\n/i);
-    const assignedEmail = post.props?.from_email || null;
+    const members = await mmFetch(
+      `${BASE_URL}/api/v4/channels/${channel.id}/members`
+    );
 
-    // Fallback: use DM participant email
-    const email = assignedEmail || post.props?.override_username;
+    const userMember = members.find(
+      m => m.user_id !== post.user_id // exclude pf-taskbot
+    );
 
+    if (!userMember) continue;
+
+    const user = await mmFetch(
+      `${BASE_URL}/api/v4/users/${userMember.user_id}`
+    );
+
+    const assignedEmail = user.email;
+
+    // 5️⃣ Insert tasks
     for (const item of items) {
       const { error } = await supabase
         .from('tasks')
         .insert({
-          mattermost_post_id: post.id + ':' + item.title, // unique per task
+          mattermost_post_id: `${post.id}:${item.title}`,
           title: item.title,
-          assigned_to_email: email,
+          assigned_to_email: assignedEmail,
           status: 'pending',
+          priority: item.priority,
           source: 'mattermost',
           created_at: new Date(post.create_at),
         });
 
       if (!error) {
-        console.log('✅ Task created:', item.title);
+        console.log(`✅ Task created for ${assignedEmail}: ${item.title}`);
       }
     }
-
-
-    // Insert task (idempotent)
-    const { error } = await supabase
-      .from('tasks')
-      .insert({
-        mattermost_post_id: post.id,
-        title,
-        assigned_to_email: email,
-        status,
-        source: 'mattermost',
-        created_at: new Date(post.create_at),
-      });
-
-    if (error && error.code !== '23505') {
-      console.error('❌ Task insert error:', error);
-    }
-    if (!error) {
-      console.log('✅ Task created:', title);
-    }
-
-    // Audit event (best effort)
-    await supabase.from('task_events').insert({
-      event_type: 'created',
-      new_status: status,
-      triggered_by_email: email,
-      source: 'mattermost',
-    });
   }
 
-  // Update cursor
   if (posts.length > 0) {
-    const newestCreateAt = posts[posts.length - 1].create_at;
-
     await supabase
       .from('mattermost_cursors')
       .upsert({
         channel_id: channel.id,
-        last_create_at: newestCreateAt,
+        last_create_at: posts[posts.length - 1].create_at,
       });
   }
 }
