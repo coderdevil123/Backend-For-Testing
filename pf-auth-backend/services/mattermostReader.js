@@ -39,29 +39,30 @@ async function getDMChannels() {
 async function processChannel(channel) {
   // Get cursor for this channel
   const { data: cursor } = await supabase
-    .from('mattermost_cursors')
-    .select('*')
-    .eq('channel_id', channel.id)
-    .maybeSingle();
-
+  .from('mattermost_cursors')
+  .select('*')
+  .eq('channel_id', channel.id)
+  .maybeSingle();
+  
   const lastCreateAt = cursor?.last_create_at || 0;
-
+  
   // Fetch posts for this channel
   const data = await mmFetch(
     `${BASE_URL}/api/v4/channels/${channel.id}/posts`
   );
-
+  
   // Mattermost returns posts as object map
   const posts = Object.values(data.posts)
-    .sort((a, b) => a.create_at - b.create_at);
-
+  .sort((a, b) => a.create_at - b.create_at);
+  
   for (const post of posts) {
     if (post.create_at <= lastCreateAt) continue;
-
+    
     const text = (post.message || '').trim();
+    console.log('📩 RAW DM TEXT:', text);
 
     const match = text.match(
-      /@([\w.+-]+@[\w.-]+)\s+\[(PENDING|IN-PROGRESS|COMPLETED|WRONG|BLOCKED|ON-HOLD)\]\s+(.+)/i
+      /(?:@)?([\w.+-]+@[\w.-]+).*?\[(PENDING|IN-PROGRESS|COMPLETED|WRONG|BLOCKED|ON-HOLD)\]\s+(.+)/i
     );
 
     if (!match) continue;
