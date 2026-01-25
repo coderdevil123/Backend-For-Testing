@@ -66,6 +66,8 @@ function extractActionItems(text) {
   return items;
 }
 
+const TASKBOT_USER_ID = process.env.MATTERMOST_TASKBOT_USER_ID;
+
 async function processChannel(channel) {
   // 1️⃣ Cursor
   const { data: cursor } = await supabase
@@ -73,47 +75,56 @@ async function processChannel(channel) {
     .select('*')
     .eq('channel_id', channel.id)
     .maybeSingle();
-
   const lastCreateAt = cursor?.last_create_at || 0;
 
   // 2️⃣ Fetch posts
   const data = await mmFetch(
     `${BASE_URL}/api/v4/channels/${channel.id}/posts`
   );
-
   const posts = Object.values(data.posts)
     .sort((a, b) => a.create_at - b.create_at);
 
   for (const post of posts) {
     if (post.create_at <= lastCreateAt) continue;
 
-    // ✅ Only messages sent by pf-taskbot
-    console.log('🧾 POST USER:', post.user_username, post.user_id);
-
-    if (!post.user_username?.includes('task')) continue;
+    // ✅ FIXED: Check user_id instead of user_username
+    console.log('🧾 POST USER ID:', post.user_id, 'Expected:', TASKBOT_USER_ID);
+    
+    if (post.user_id !== TASKBOT_USER_ID) {
+      console.log('⏭️ Skipping - not from taskbot');
+      continue;
+    }
 
     const text = (post.message || '').trim();
-    console.log('📩 RAW DM TEXT:', text);
+    console.log('📩 RAW DM TEXT:', text.substring(0, 200)); // Log first 200 chars
 
     // 3️⃣ Extract action items
     const items = extractActionItems(text);
-    if (items.length === 0) continue;
+    console.log('📋 Extracted items:', items.length);
+    
+    if (items.length === 0) {
+      console.log('⚠️ No action items found in message');
+      continue;
+    }
 
+    // 4️⃣ Get the user this DM is with
     const members = await mmFetch(
       `${BASE_URL}/api/v4/channels/${channel.id}/members`
     );
-
     const userMember = members.find(
-      m => m.user_id !== post.user_id // exclude pf-taskbot
+      m => m.user_id !== TASKBOT_USER_ID // exclude pf-taskbot
     );
-
-    if (!userMember) continue;
+    
+    if (!userMember) {
+      console.log('⚠️ No user member found');
+      continue;
+    }
 
     const user = await mmFetch(
       `${BASE_URL}/api/v4/users/${userMember.user_id}`
     );
-
     const assignedEmail = user.email;
+    console.log('👤 Assigning to:', assignedEmail);
 
     // 5️⃣ Insert tasks
     for (const item of items) {
@@ -128,20 +139,24 @@ async function processChannel(channel) {
           source: 'mattermost',
           created_at: new Date(post.create_at),
         });
-
-      if (!error) {
+      
+      if (error) {
+        console.error('❌ Error inserting task:', error.message);
+      } else {
         console.log(`✅ Task created for ${assignedEmail}: ${item.title}`);
       }
     }
   }
 
   if (posts.length > 0) {
+    const maxCreateAt = Math.max(...posts.map(p => p.create_at));
     await supabase
       .from('mattermost_cursors')
       .upsert({
         channel_id: channel.id,
-        last_create_at: posts[posts.length - 1].create_at,
+        last_create_at: maxCreateAt,
       });
+    console.log('📍 Cursor updated to:', maxCreateAt);
   }
 }
 
