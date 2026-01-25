@@ -88,7 +88,9 @@ async function processChannel(channel) {
     if (post.create_at <= lastCreateAt) continue;
 
     // ✅ Only messages sent by pf-taskbot
-    if (post.user_username !== 'pf-taskbot') continue;
+    console.log('🧾 POST USER:', post.user_username, post.user_id);
+
+    if (!post.user_username?.includes('task')) continue;
 
     const text = (post.message || '').trim();
     console.log('📩 RAW DM TEXT:', text);
