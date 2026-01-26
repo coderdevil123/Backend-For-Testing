@@ -36,15 +36,29 @@ async function getDMChannels() {
   return channels.filter(c => c.type === 'D');
 }
 
+function normalizeText(text) {
+  return text
+    // remove markdown underlines
+    .replace(/^[=\-]{3,}$/gm, '')
+    // remove excessive separators
+    .replace(/_{3,}/g, '')
+    // normalize emojis spacing
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
+
 function extractActionItems(text) {
   console.log('🔍 FULL TEXT LENGTH:', text.length);
 
   // Normalize text (remove markdown noise)
-  const cleanText = text.replace(/\*\*|__/g, '');
+  const cleanText = normalizeText(
+    text.replace(/\*\*|__/g, '')
+  );
 
   // Match Action Items section (robust)
   const actionMatch = cleanText.match(
-    /(Your Action Items(?:\s*&\s*Key Updates)?)([\s\S]*?)(?=⚙️|💬|➡️|$)/i
+    /Your Action Items(?:\s*&\s*Key Updates)?([\s\S]*?)(?=⚙️|💬|➡️|Next Steps|$)/i
   );
 
   if (!actionMatch) {
@@ -52,8 +66,12 @@ function extractActionItems(text) {
     return [];
   }
 
-  const actionBlock = actionMatch[2];
-  console.log('📦 Action block length:', actionBlock.length);
+  const actionBlock = actionMatch?.[1];
+  if (!actionBlock) {
+    console.log('❌ Could not find Action Items section');
+    return [];
+  }
+
 
   const items = [];
 
