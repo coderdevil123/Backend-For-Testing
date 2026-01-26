@@ -145,26 +145,33 @@ async function processChannel(channel) {
     }
 
     // 4️⃣ Get the user this DM is with
-    const members = await mmFetch(
-      `${BASE_URL}/api/v4/channels/${channel.id}/members`
-    );
-    const BACKEND_BOT_USER_ID = process.env.MATTERMOST_BACKEND_BOT_USER_ID;
+    // const members = await mmFetch(
+    //   `${BASE_URL}/api/v4/channels/${channel.id}/members`
+    // );
+    // const BACKEND_BOT_USER_ID = process.env.MATTERMOST_BACKEND_BOT_USER_ID;
 
-    const userMember = members.find(
-      m =>
-        m.user_id !== TASKBOT_USER_ID &&
-        m.user_id !== BACKEND_BOT_USER_ID
-    );
+    // const userMember = members.find(
+    //   m =>
+    //     m.user_id !== TASKBOT_USER_ID &&
+    //     m.user_id !== BACKEND_BOT_USER_ID
+    // );
     
-    if (!userMember) {
-      console.log('⚠️ No user member found');
+    // if (!userMember) {
+    //   console.log('⚠️ No user member found');
+    //   continue;
+    // }
+
+    // const user = await mmFetch(
+    //   `${BASE_URL}/api/v4/users/${userMember.user_id}`
+    // );
+    // const assignedEmail = user.email;
+    const assignedEmail = extractAssigneeEmail(text);
+
+    if (!assignedEmail) {
+      console.log('⚠️ No assignee email found in message');
       continue;
     }
 
-    const user = await mmFetch(
-      `${BASE_URL}/api/v4/users/${userMember.user_id}`
-    );
-    const assignedEmail = user.email;
     console.log('👤 Assigning to:', assignedEmail);
 
     // 5️⃣ Insert tasks
