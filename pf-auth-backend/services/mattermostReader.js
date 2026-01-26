@@ -2,7 +2,8 @@ const { supabase } = require('../lib/supabase');
 
 const BASE_URL = process.env.MATTERMOST_BASE_URL;
 const BOT_TOKEN = process.env.MATTERMOST_BOT_TOKEN;
-const TASKBOT_USER_ID = process.env.MATTERMOST_TASKBOT_USER_ID; // pf-taskbot ID
+
+/* -------------------- Helpers -------------------- */
 
 async function mmFetch(url) {
   const res = await fetch(url, {
@@ -19,204 +20,121 @@ async function mmFetch(url) {
   return res.json();
 }
 
-// ✅ Get ALL DM channels where taskbot is a member
-async function getTaskbotDMChannels() {
-  try {
-    // Get all channels for the taskbot user
-    const channels = await mmFetch(
-      `${BASE_URL}/api/v4/users/${TASKBOT_USER_ID}/channels`
-    );
-
-    // Filter for DM channels only
-    const dmChannels = channels.filter(c => c.type === 'D');
-    console.log(`📬 Found ${dmChannels.length} DM channels for taskbot`);
-    
-    return dmChannels;
-  } catch (error) {
-    console.error('❌ Error fetching taskbot channels:', error.message);
-    // Fallback: get channels accessible by backend bot
-    const channels = await mmFetch(`${BASE_URL}/api/v4/users/me/channels`);
-    return channels.filter(c => c.type === 'D');
-  }
-}
-
 function normalizeText(text) {
   return text
+    .replace(/\*\*|__/g, '')
     .replace(/^[=\-]{3,}$/gm, '')
-    .replace(/_{3,}/g, '')
     .replace(/\r\n/g, '\n')
     .trim();
 }
 
+function extractAssigneeEmail(text) {
+  const match = text.match(/@([\w.+-]+@[\w.-]+)/);
+  return match ? match[1] : null;
+}
+
 function extractActionItems(text) {
-  console.log('🔍 Processing text, length:', text.length);
+  const clean = normalizeText(text);
 
-  const cleanText = normalizeText(text.replace(/\*\*|__/g, ''));
+  // Must contain Action Items
+  if (!clean.includes('Your Action Items')) return [];
 
-  // Match "Your Action Items" section - be more flexible
-  const actionMatch = cleanText.match(
-    /✅\s*Your Action Items[\s\S]*?(🔴\s*High Priority[\s\S]*?)(?=⚙️|💬|➡️|$)/i
-  );
-
-  if (!actionMatch) {
-    console.log('❌ No action items section found');
-    return [];
-  }
-
-  const actionBlock = actionMatch[1];
   const items = [];
 
-  // Extract High Priority items
-  const highMatch = actionBlock.match(/🔴\s*High Priority([\s\S]*?)(?=🟡\s*Medium Priority|$)/i);
+  // High priority
+  const highMatch = clean.match(/🔴\s*High Priority([\s\S]*?)(?=🟡|⚙️|💬|➡️|$)/i);
   if (highMatch) {
-    const lines = highMatch[1].split('\n');
-    lines.forEach(line => {
-      if (line.includes('🔴')) {
-        // Extract title before date/time markers
-        const title = line
-          .replace(/🔴/g, '')
-          .split(/📅|🕐/)[0]
-          .trim();
-        
-        if (title && title.length > 3) {
-          items.push({ title, priority: 'high' });
-        }
-      }
-    });
+    highMatch[1]
+      .split('\n')
+      .filter(l => l.includes('🔴'))
+      .forEach(line => {
+        const title = line.replace(/🔴/g, '').split(/📅|🕐/)[0].trim();
+        if (title) items.push({ title, priority: 'high' });
+      });
   }
 
-  // Extract Medium Priority items
-  const mediumMatch = actionBlock.match(/🟡\s*Medium Priority([\s\S]*?)(?=⚙️|💬|➡️|$)/i);
-  if (mediumMatch) {
-    const lines = mediumMatch[1].split('\n');
-    lines.forEach(line => {
-      if (line.includes('🟡')) {
-        const title = line
-          .replace(/🟡/g, '')
-          .split(/📅|🕐/)[0]
-          .trim();
-        
-        if (title && title.length > 3) {
-          items.push({ title, priority: 'medium' });
-        }
-      }
-    });
+  // Medium priority
+  const medMatch = clean.match(/🟡\s*Medium Priority([\s\S]*?)(?=⚙️|💬|➡️|$)/i);
+  if (medMatch) {
+    medMatch[1]
+      .split('\n')
+      .filter(l => l.includes('🟡'))
+      .forEach(line => {
+        const title = line.replace(/🟡/g, '').split(/📅|🕐/)[0].trim();
+        if (title) items.push({ title, priority: 'medium' });
+      });
   }
 
-  console.log(`📋 Extracted ${items.length} items:`, items.map(i => i.title.substring(0, 50)));
   return items;
 }
 
-// Extract email from the message header
-function extractAssigneeEmail(text) {
-  // Look for "Hi [Name]!" pattern and email in the message
-  const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.\w+/);
-  return emailMatch ? emailMatch[0] : null;
-}
+/* -------------------- Core Logic -------------------- */
 
-// Get the actual user's email from the DM channel
-async function getUserEmailFromChannel(channelId) {
-  try {
-    const members = await mmFetch(
-      `${BASE_URL}/api/v4/channels/${channelId}/members`
-    );
-    
-    // Find the member who is NOT the taskbot
-    const userMember = members.find(m => m.user_id !== TASKBOT_USER_ID);
-    
-    if (!userMember) {
-      console.log('⚠️ No user member found in channel');
-      return null;
-    }
+async function getBackendBotDMChannels() {
+  const channels = await mmFetch(
+    `${BASE_URL}/api/v4/users/me/channels`
+  );
 
-    const user = await mmFetch(
-      `${BASE_URL}/api/v4/users/${userMember.user_id}`
-    );
-    
-    return user.email;
-  } catch (error) {
-    console.error('❌ Error getting user email:', error.message);
-    return null;
-  }
+  return channels.filter(c => c.type === 'D');
 }
 
 async function processChannel(channel) {
-  console.log(`\n🔍 Processing channel: ${channel.id}`);
-
-  // Get cursor
   const { data: cursor } = await supabase
     .from('mattermost_cursors')
     .select('*')
     .eq('channel_id', channel.id)
     .maybeSingle();
-  
-  const lastCreateAt = cursor?.last_create_at || 0;
-  console.log('📍 Last processed timestamp:', lastCreateAt);
 
-  // Fetch posts from this channel
+  const lastCreateAt = cursor?.last_create_at || 0;
+
   const data = await mmFetch(
     `${BASE_URL}/api/v4/channels/${channel.id}/posts`
   );
-  
+
   const posts = Object.values(data.posts || {})
     .sort((a, b) => a.create_at - b.create_at);
 
-  console.log(`📝 Total posts: ${posts.length}`);
-
-  let newPostsProcessed = 0;
-
   for (const post of posts) {
-    // Skip already processed posts
     if (post.create_at <= lastCreateAt) continue;
 
-    console.log(`\n📬 Post from user: ${post.user_id}`);
-    
-    // Only process posts from taskbot
-    if (post.user_id !== TASKBOT_USER_ID) {
-      console.log('⏭️ Skipping - not from taskbot');
+    const text = (post.message || '').trim();
+    console.log('📩 RAW DM TEXT:', text.substring(0, 120));
+
+    // 🔒 CONTENT FILTER (THIS IS THE KEY)
+    if (!text.includes('Your Action Items')) {
+      console.log('⏭️ Skipping – not a task summary');
       continue;
     }
 
-    const text = (post.message || '').trim();
-    console.log('📩 Message preview:', text.substring(0, 150) + '...');
-
-    // Extract action items
     const items = extractActionItems(text);
-    
     if (items.length === 0) {
       console.log('⚠️ No action items found');
       continue;
     }
 
-    // Get the user's email from the DM channel
-    const assignedEmail = await getUserEmailFromChannel(channel.id);
-    
+    const assignedEmail = extractAssigneeEmail(text);
     if (!assignedEmail) {
-      console.log('❌ Could not determine user email for this channel');
+      console.log('⚠️ No assignee email found');
       continue;
     }
 
-    console.log(`👤 Assigning ${items.length} tasks to: ${assignedEmail}`);
+    console.log(`👤 Assigning ${items.length} tasks to ${assignedEmail}`);
 
-    // Insert tasks into Supabase
     for (const item of items) {
-      const taskId = `${post.id}:${item.title.substring(0, 50)}`;
-      
-      const { data: existingTask } = await supabase
+      const taskKey = `${post.id}:${item.title}`;
+
+      const { data: exists } = await supabase
         .from('tasks')
         .select('id')
-        .eq('mattermost_post_id', taskId)
+        .eq('mattermost_post_id', taskKey)
         .maybeSingle();
 
-      if (existingTask) {
-        console.log(`⏭️ Task already exists: ${item.title.substring(0, 40)}...`);
-        continue;
-      }
+      if (exists) continue;
 
       const { error } = await supabase
         .from('tasks')
         .insert({
-          mattermost_post_id: taskId,
+          mattermost_post_id: taskKey,
           title: item.title,
           assigned_to_email: assignedEmail,
           status: 'pending',
@@ -224,18 +142,15 @@ async function processChannel(channel) {
           source: 'mattermost',
           created_at: new Date(post.create_at).toISOString(),
         });
-      
+
       if (error) {
-        console.error(`❌ Error inserting task: ${error.message}`);
+        console.error('❌ Task insert error:', error.message);
       } else {
-        console.log(`✅ Task created: ${item.title.substring(0, 50)}...`);
+        console.log(`✅ Task created: ${item.title}`);
       }
     }
-
-    newPostsProcessed++;
   }
 
-  // Update cursor to latest post
   if (posts.length > 0) {
     const maxCreateAt = Math.max(...posts.map(p => p.create_at));
     await supabase
@@ -244,43 +159,27 @@ async function processChannel(channel) {
         channel_id: channel.id,
         last_create_at: maxCreateAt,
       });
-    console.log(`📍 Cursor updated to: ${maxCreateAt} (${new Date(maxCreateAt).toISOString()})`);
   }
-
-  return newPostsProcessed;
 }
 
 async function runMattermostReader() {
   try {
-    if (!BOT_TOKEN || !BASE_URL || !TASKBOT_USER_ID) {
-      console.error('❌ Missing environment variables!');
-      console.error('Required: MATTERMOST_BASE_URL, MATTERMOST_BOT_TOKEN, MATTERMOST_TASKBOT_USER_ID');
+    if (!BOT_TOKEN || !BASE_URL) {
+      console.error('❌ Missing Mattermost env vars');
       return;
     }
 
-    console.log('\n🚀 Starting Mattermost Reader...');
-    console.log(`📡 Base URL: ${BASE_URL}`);
-    console.log(`🤖 Taskbot ID: ${TASKBOT_USER_ID}`);
-
-    const channels = await getTaskbotDMChannels();
-
-    console.log(`\n📬 Found ${channels.length} DM channels to process`);
-
-    let totalProcessed = 0;
+    console.log('🔄 Checking pf-backend-bot DMs...');
+    const channels = await getBackendBotDMChannels();
 
     for (const channel of channels) {
-      const processed = await processChannel(channel);
-      totalProcessed += processed;
+      await processChannel(channel);
     }
 
-    console.log(`\n✅ Completed! Processed ${totalProcessed} new posts`);
-
+    console.log('✅ Mattermost scan complete');
   } catch (err) {
-    console.error('\n🔥 Mattermost reader error:', err.message);
-    console.error(err.stack);
+    console.error('🔥 Mattermost reader error:', err.message);
   }
 }
 
-module.exports = {
-  runMattermostReader,
-};
+module.exports = { runMattermostReader };
