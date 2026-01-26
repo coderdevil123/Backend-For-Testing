@@ -112,7 +112,7 @@ async function processChannel(channel) {
       continue;
     }
 
-    const assignedEmail = extractAssigneeEmail(text);
+    const assignedEmail = await resolveAssigneeEmail(text);
     if (!assignedEmail) {
       console.log('⚠️ No assignee email found');
       continue;
@@ -161,6 +161,25 @@ async function processChannel(channel) {
       });
   }
 }
+
+async function resolveAssigneeEmail(text) {
+  const direct = extractAssigneeEmail(text);
+  if (direct) return direct;
+
+  const nameMatch = text.match(/Hi\s+([A-Za-z\s]+)!/i);
+  if (!nameMatch) return null;
+
+  const name = nameMatch[1].trim();
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('email')
+    .ilike('name', `%${name}%`)
+    .maybeSingle();
+
+  return data?.email || null;
+}
+
 
 async function runMattermostReader() {
   try {
