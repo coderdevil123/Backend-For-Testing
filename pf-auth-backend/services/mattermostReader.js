@@ -65,6 +65,18 @@ function extractActionItems(text) {
       });
   }
 
+  // Low priority
+  const lowMatch = clean.match(/🟢\s*Low Priority([\s\S]*?)(?=⚙️|💬|➡️|$)/i);
+  if (lowMatch) {
+    lowMatch[1]
+      .split('\n')
+      .filter(l => l.includes('🟢'))
+      .forEach(line => {
+        const title = line.replace(/🟢/g, '').split(/📅|🕐|💬/)[0].trim();
+        if (title) items.push({ title, priority: 'low' });
+      });
+  }
+
   return items;
 }
 
