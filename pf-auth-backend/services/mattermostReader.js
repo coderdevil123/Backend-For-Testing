@@ -105,6 +105,11 @@ function extractActionItems(text) {
 
 const TASKBOT_USER_ID = process.env.MATTERMOST_TASKBOT_USER_ID;
 
+function extractAssigneeEmail(text) {
+  const match = text.match(/@([\w.+-]+@[\w.-]+)/);
+  return match ? match[1] : null;
+}
+
 async function processChannel(channel) {
   // 1️⃣ Cursor
   const { data: cursor } = await supabase
