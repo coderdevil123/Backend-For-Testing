@@ -12,7 +12,7 @@ const profileRoutes = require('./routes/profile');
 const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
 const cron = require('node-cron');
-const { runMattermostReader } = require('./services/mattermostReader');
+// const { runMattermostReader } = require('./services/mattermostReader');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
