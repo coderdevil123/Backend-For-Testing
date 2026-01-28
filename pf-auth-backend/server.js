@@ -109,7 +109,7 @@ app.listen(PORT, () => {
   console.log(`Auth server running on port ${PORT}`);
 });
 
-cron.schedule('* * * * *', async () => {
-  console.log('🔄 Checking Mattermost DMs...');
-  await runMattermostReader();
-});
+// cron.schedule('* * * * *', async () => {
+//   console.log('🔄 Checking Mattermost DMs...');
+//   await runMattermostReader();
+// });
