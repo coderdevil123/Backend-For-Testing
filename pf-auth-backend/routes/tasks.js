@@ -114,4 +114,62 @@ router.post('/reassign/:requestId', auth, async (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/tasks/reassign/inbox
+router.get('/reassign/inbox', auth, async (req, res) => {
+  const email = req.user.email;
+
+  const { data, error } = await supabase
+    .from('task_reassignment_requests')
+    .select(`
+      id,
+      status,
+      created_at,
+      tasks (
+        id,
+        title
+      ),
+      from_email
+    `)
+    .eq('to_email', email)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
+// POST /api/tasks/reassign/:id
+router.post('/reassign/:id', auth, async (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body; // accepted | rejected
+  const email = req.user.email;
+
+  const { data: request } = await supabase
+    .from('task_reassignment_requests')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!request || request.to_email !== email) {
+    return res.status(403).json({ error: 'Not allowed' });
+  }
+
+  if (action === 'accepted') {
+    await supabase
+      .from('tasks')
+      .update({ assigned_to_email: email })
+      .eq('id', request.task_id);
+  }
+
+  await supabase
+    .from('task_reassignment_requests')
+    .update({ status: action })
+    .eq('id', id);
+
+  res.json({ success: true });
+});
+
 module.exports = router;
