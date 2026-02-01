@@ -32,6 +32,27 @@ app.use(
   })
 );
 
+const ALLOWED_ORIGINS = [
+  'https://pf-workspace.vercel.app',
+  'http://10.10.10.57:8090',
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow curl / server requests
+      if (!origin) return callback(null, true);
+
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
 app.use(passport.initialize());
 
 app.use(express.json());
