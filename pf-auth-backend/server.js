@@ -13,11 +13,25 @@ const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
 const cron = require('node-cron');
 // const { runMattermostReader } = require('./services/mattermostReader');
+const session = require('express-session');
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true,
-}));
+// app.use(cors({
+//   origin: process.env.FRONTEND_URL,
+//   credentials: true,
+// }));
+
+app.use(
+  session({
+    secret: process.env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+    },
+  })
+);
+
 app.use(passport.initialize());
 
 app.use(express.json());
@@ -34,12 +48,22 @@ app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
 });
 
-app.get(
-  '/auth/google',
+app.get('/auth/google', (req, res, next) => {
+  const { origin } = req.query;
+
+  const ALLOWED_ORIGINS = [
+    'https://pf-workspace.vercel.app',
+    'http://10.10.10.57:8090',
+  ];
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    req.session.oauth_origin = origin;
+  }
+
   passport.authenticate('google', {
     scope: ['profile', 'email'],
-  })
-);
+  })(req, res, next);
+});
 
 app.get(
   '/auth/google/callback',
@@ -94,9 +118,11 @@ app.get(
       { expiresIn: '7d' }
     );
 
-    res.redirect(
-      `${process.env.FRONTEND_URL}/oauth/success?token=${token}`
-    );
+    const origin = req.session.oauth_origin || process.env.FRONTEND_URL;
+
+    delete req.session.oauth_origin;
+
+    res.redirect(`${origin}/oauth/success?token=${token}`);
   }
 );
 
