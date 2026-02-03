@@ -35,7 +35,7 @@ app.use(
 const ALLOWED_ORIGINS = [
   'https://pf-workspace.vercel.app',
   'http://10.10.10.57:8090',
-  'https://pfworkspace.growthsupercharged.com/',
+  'https://pfworkspace.growthsupercharged.com',
 ];
 
 app.use(
@@ -76,7 +76,7 @@ app.get('/auth/google', (req, res, next) => {
   const ALLOWED_ORIGINS = [
     'https://pf-workspace.vercel.app',
     'http://10.10.10.57:8090',
-    'https://pfworkspace.growthsupercharged.com/',
+    'https://pfworkspace.growthsupercharged.com',
   ];
 
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
