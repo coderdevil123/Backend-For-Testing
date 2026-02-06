@@ -5,9 +5,9 @@ const auth = require('../middlewares/auth');
 const router = express.Router();
 
 router.patch('/update-role', auth, async (req, res) => {
-  // 🔐 Only admin allowed
-  if (req.user.role !== 'Admin') {
-    return res.status(403).json({ error: 'Admin only' });
+  // 🔐 ADMIN CHECK
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const { userId, role, department } = req.body;
@@ -19,13 +19,14 @@ router.patch('/update-role', auth, async (req, res) => {
   const { error } = await supabase
     .from('profiles')
     .update({
-      role,
+      role: role.toLowerCase(),
       department: department || null,
     })
     .eq('id', userId);
 
   if (error) {
-    return res.status(500).json({ error: error.message });
+    console.error(error);
+    return res.status(500).json({ error: 'Update failed' });
   }
 
   res.json({ success: true });
