@@ -33,11 +33,13 @@ router.get('/public', async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, role, department')
-    .eq('id', req.user.id)
+    .select('email, role, department')
+    .eq('email', req.user.email)
     .single();
 
-  if (error) return res.status(500).json(error);
+  if (error) {
+    return res.status(500).json(error);
+  }
 
   res.json(data);
 });
