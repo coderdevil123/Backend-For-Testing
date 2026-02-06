@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.patch('/update-role', auth, async (req, res) => {
   // 🔐 Only admin allowed
-  if (req.user.role !== 'Admin') {
+  if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
 
