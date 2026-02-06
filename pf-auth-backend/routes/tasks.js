@@ -172,4 +172,27 @@ router.post('/reassign/:id', auth, async (req, res) => {
   res.json({ success: true });
 });
 
+// router.post('/from-mattermost', async (req, res) => {
+//   const { taskTitle, assignedTo, meetingData } = req.body;
+
+//   // Insert summary
+//   const { data: meeting } = await supabase
+//     .from('meeting_summaries')
+//     .insert(meetingData)
+//     .select()
+//     .single();
+
+//   // Insert task
+//   await supabase
+//     .from('tasks')
+//     .insert({
+//       title: taskTitle,
+//       assigned_to_email: assignedTo,
+//       meeting_id: meeting.id
+//     });
+
+//   res.json({ success: true });
+// });
+
+
 module.exports = router;
