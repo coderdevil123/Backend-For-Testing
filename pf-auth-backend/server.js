@@ -103,7 +103,7 @@ app.get(
     // Check if profile already exists
   const { data: existingProfile } = await supabase
     .from('profiles')
-    .select('avatar_url')
+    .select('avatar_url, role, department')
     .eq('email', req.user.email)
     .maybeSingle();
 
