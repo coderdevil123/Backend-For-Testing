@@ -131,12 +131,23 @@ app.get(
       return res.status(500).send('Profile sync failed');
     }
 
+    const { data: profile, error: roleError } = await supabase
+      .from('profiles')
+      .select('role, department')
+      .eq('email', req.user.email)
+      .single();
+
+    if (roleError) {
+      console.error('Role fetch failed:', roleError);
+    }
 
     const token = jwt.sign(
       {
         google_id: req.user.google_id,
         email: req.user.email,
         name: req.user.name,
+        role: profile?.role || 'user',
+        department: profile?.department || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
