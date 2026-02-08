@@ -112,8 +112,8 @@ app.get(
       google_id: req.user.google_id,
       email: req.user.email,
       name: req.user.name,
-      role: 'Member',
-      department: 'General',
+      role: existingProfile?.role ?? 'member',
+      department: existingProfile?.department ?? 'general',
     };
 
     // Only set avatar_url IF it does NOT exist yet
@@ -146,8 +146,8 @@ app.get(
         google_id: req.user.google_id,
         email: req.user.email,
         name: req.user.name,
-        role: profile?.role || 'user',
-        department: profile?.department || null,
+        role: payload.role,          // ✅ FROM DB
+        department: payload.department,
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
