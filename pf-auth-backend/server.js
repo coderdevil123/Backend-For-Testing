@@ -103,7 +103,7 @@ app.get(
     // Check if profile already exists
   const { data: existingProfile } = await supabase
     .from('profiles')
-    .select('avatar_url, role, department')
+    .select('avatar_url')
     .eq('email', req.user.email)
     .maybeSingle();
 
@@ -112,8 +112,6 @@ app.get(
       google_id: req.user.google_id,
       email: req.user.email,
       name: req.user.name,
-      // role: existingProfile?.role ?? 'member',
-      // department: existingProfile?.department ?? 'general',
     };
 
     // Only set avatar_url IF it does NOT exist yet
@@ -131,23 +129,11 @@ app.get(
       return res.status(500).send('Profile sync failed');
     }
 
-    const { data: profile, error: roleError } = await supabase
-      .from('profiles')
-      .select('role, department')
-      .eq('email', req.user.email)
-      .single();
-
-    if (roleError) {
-      console.error('Role fetch failed:', roleError);
-    }
-
     const token = jwt.sign(
       {
         google_id: req.user.google_id,
         email: req.user.email,
         name: req.user.name,
-        role: profile?.role || 'member',
-        department: profile?.department || 'general'
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
