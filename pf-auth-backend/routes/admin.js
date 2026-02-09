@@ -21,30 +21,33 @@ router.patch('/update-role', auth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  let finalDepartment = department || 'general';
+  // ✅ ROLE → DEPARTMENT RULES
+  let updatePayload = {
+    role: role.toLowerCase(),
+  };
 
   if (role === 'admin') {
-    finalDepartment = 'leadership';
-  }
-
-  if (role === 'member') {
-    finalDepartment = 'general';
+    // 🔒 ADMIN has NO department
+    updatePayload.department = 'leadership';
+  } else if (['team_lead', 'intern'].includes(role)) {
+    updatePayload.department = department || 'general';
+  } else {
+    // member
+    updatePayload.department = 'general';
   }
 
   const { error } = await supabase
     .from('profiles')
-    .update({
-      role: finalRole,
-      department: finalDepartment,
-    })
+    .update(updatePayload)
     .eq('email', email);
 
   if (error) {
-    console.error(error);
+    console.error('Role update failed:', error);
     return res.status(500).json({ error: 'Update failed' });
   }
 
   res.json({ success: true });
 });
+
 
 module.exports = router;
