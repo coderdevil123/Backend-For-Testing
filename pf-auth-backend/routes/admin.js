@@ -10,9 +10,9 @@ router.patch('/update-role', auth, async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const { userId, role, department } = req.body;
+  const { email, role, department } = req.body;
 
-  if (!userId || !role) {
+  if (!email || !role) {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
