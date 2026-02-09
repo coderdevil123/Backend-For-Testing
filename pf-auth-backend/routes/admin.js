@@ -21,12 +21,14 @@ router.patch('/update-role', auth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid role' });
   }
 
-  let finalRole = role.toLowerCase();
-  let finalDepartment = department ? department.toLowerCase() : null;
+  let finalDepartment = department || 'general';
 
-  // 🔐 Enforce admin rules
-  if (finalRole === 'admin') {
+  if (role === 'admin') {
     finalDepartment = 'leadership';
+  }
+
+  if (role === 'member') {
+    finalDepartment = 'general';
   }
 
   const { error } = await supabase
