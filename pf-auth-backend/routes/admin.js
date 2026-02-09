@@ -22,7 +22,7 @@ router.patch('/update-role', auth, async (req, res) => {
       role: role.toLowerCase(),
       department: department || null,
     })
-    .eq('id', userId);
+    .eq('email', email);
 
   if (error) {
     console.error(error);
