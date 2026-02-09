@@ -112,8 +112,8 @@ app.get(
       google_id: req.user.google_id,
       email: req.user.email,
       name: req.user.name,
-      role: existingProfile?.role ?? 'member',
-      department: existingProfile?.department ?? 'general',
+      // role: existingProfile?.role ?? 'member',
+      // department: existingProfile?.department ?? 'general',
     };
 
     // Only set avatar_url IF it does NOT exist yet
