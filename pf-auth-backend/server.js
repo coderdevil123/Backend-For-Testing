@@ -146,8 +146,8 @@ app.get(
         google_id: req.user.google_id,
         email: req.user.email,
         name: req.user.name,
-        role: payload.role,          // ✅ FROM DB
-        department: payload.department,
+        role: profile?.role || 'member',
+        department: profile?.department || 'general'
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
