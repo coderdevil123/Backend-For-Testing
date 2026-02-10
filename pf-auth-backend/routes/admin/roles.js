@@ -41,4 +41,21 @@ router.post('/', async (req, res) => {
   res.json({ success: true });
 });
 
+// DELETE role
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('roles')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to delete role' });
+  }
+
+  res.json({ success: true });
+});
+
 module.exports = router;
