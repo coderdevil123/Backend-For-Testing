@@ -1,43 +1,25 @@
 const { supabase } = require('../lib/supabase');
 
-async function getAdminContext(email) {
+async function requireAdmin(req, res, next) {
+  const email = req.user.email;
+
   const { data, error } = await supabase
     .from('admin_assignments')
-    .select(`
-      role:roles(name, level),
-      department:departments(name),
-      is_active
-    `)
-    .eq('email', email)
+    .select('role_id, is_active')
+    .eq('user_email', email)
     .eq('is_active', true)
     .maybeSingle();
 
   if (error) {
-    console.error('Admin access lookup failed:', error);
-    return null;
+    console.error('Admin check failed:', error);
+    return res.status(500).json({ error: 'Admin check failed' });
   }
 
-  if (!data) return null;
-
-  return {
-    role: data.role?.name,
-    roleLevel: data.role?.level ?? 0,
-    department: data.department?.name,
-  };
-}
-
-async function requireAdmin(req, res, next) {
-  const adminContext = await getAdminContext(req.user.email);
-
-  if (!adminContext) {
+  if (!data || !data.role_id) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  req.admin = adminContext;
   next();
 }
 
-module.exports = {
-  getAdminContext,
-  requireAdmin,
-};
+module.exports = { requireAdmin };
