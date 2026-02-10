@@ -53,25 +53,24 @@ router.get('/', async (req, res) => {
       name,
       admin_assignments (
         role_id,
-        department_id,
-        is_active
+        department_id
       )
     `)
     .order('name');
 
   if (error) {
-    return res.status(500).json(error);
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to load assignments' });
   }
 
-  // Normalize response
-  const result = data.map(p => ({
+  const normalized = data.map(p => ({
     email: p.email,
     name: p.name,
     role_id: p.admin_assignments?.[0]?.role_id ?? null,
     department_id: p.admin_assignments?.[0]?.department_id ?? null,
   }));
 
-  res.json(result);
+  res.json(normalized);
 });
 
 module.exports = router;
