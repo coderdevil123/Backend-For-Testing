@@ -10,24 +10,34 @@ router.get('/', async (req, res) => {
     .select('*')
     .order('name');
 
-  if (error) return res.status(500).json(error);
+  if (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+
   res.json(data);
 });
 
 // CREATE role
 router.post('/', async (req, res) => {
-  const { name, level } = req.body;
+  const { name, description } = req.body;
 
-  if (!name || level === undefined) {
-    return res.status(400).json({ error: 'Missing fields' });
+  if (!name) {
+    return res.status(400).json({ error: 'Role name is required' });
   }
 
-  const { error } = await supabase.from('roles').insert({
-    name,
-    created_by: req.user.email,
-  });
+  const { error } = await supabase
+    .from('roles')
+    .insert({
+      name,
+      description: description || null,
+    });
 
-  if (error) return res.status(500).json(error);
+  if (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to create role' });
+  }
+
   res.json({ success: true });
 });
 
