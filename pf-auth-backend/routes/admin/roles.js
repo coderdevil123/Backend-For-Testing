@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
   const { data, error } = await supabase
     .from('roles')
     .select('*')
-    .order('level');
+    .order('name');
 
   if (error) return res.status(500).json(error);
   res.json(data);
@@ -24,7 +24,6 @@ router.post('/', async (req, res) => {
 
   const { error } = await supabase.from('roles').insert({
     name,
-    level,
     created_by: req.user.email,
   });
 
