@@ -4,26 +4,33 @@ const { supabase } = require('../../lib/supabase');
 const router = express.Router();
 
 // Assign role
-router.post('/', async (req, res) => {
+router.patch('/', async (req, res) => {
   const { email, role_id, department_id } = req.body;
 
-  if (!email || !role_id) {
-    return res.status(400).json({ error: 'Missing fields' });
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
   }
 
   const { error } = await supabase
     .from('admin_assignments')
     .upsert({
-      email,
-      role_id,
+      user_email: email,
+      role_id: role_id || null,
       department_id: department_id || null,
       assigned_by: req.user.email,
       is_active: true,
+    }, {
+      onConflict: 'user_email',
     });
 
-  if (error) return res.status(500).json(error);
+  if (error) {
+    console.error('Assignment update failed:', error);
+    return res.status(500).json({ error: 'Update failed' });
+  }
+
   res.json({ success: true });
 });
+
 
 // Revoke access
 router.delete('/:email', async (req, res) => {
@@ -32,10 +39,44 @@ router.delete('/:email', async (req, res) => {
   const { error } = await supabase
     .from('admin_assignments')
     .update({ is_active: false })
-    .eq('email', email);
+    .eq('user_email', email);
 
   if (error) return res.status(500).json(error);
   res.json({ success: true });
+});
+
+router.get('/', async (req, res) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      email,
+      name,
+      admin_assignments (
+        role_id,
+        department_id,
+        is_active
+      )
+    `)
+    .order('name');
+
+  if (error) {
+    console.error('Assignments fetch failed:', error);
+    return res.status(500).json({ error: 'Failed to load assignments' });
+  }
+
+  // Normalize response for frontend
+  const result = data.map(profile => {
+    const assignment = profile.admin_assignments?.[0];
+
+    return {
+      email: profile.email,
+      name: profile.name,
+      role_id: assignment?.is_active ? assignment.role_id : null,
+      department_id: assignment?.is_active ? assignment.department_id : null,
+    };
+  });
+
+  res.json(result);
 });
 
 module.exports = router;
