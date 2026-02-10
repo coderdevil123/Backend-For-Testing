@@ -60,21 +60,16 @@ router.get('/', async (req, res) => {
     .order('name');
 
   if (error) {
-    console.error('Assignments fetch failed:', error);
-    return res.status(500).json({ error: 'Failed to load assignments' });
+    return res.status(500).json(error);
   }
 
-  // Normalize response for frontend
-  const result = data.map(profile => {
-    const assignment = profile.admin_assignments?.[0];
-
-    return {
-      email: profile.email,
-      name: profile.name,
-      role_id: assignment?.is_active ? assignment.role_id : null,
-      department_id: assignment?.is_active ? assignment.department_id : null,
-    };
-  });
+  // Normalize response
+  const result = data.map(p => ({
+    email: p.email,
+    name: p.name,
+    role_id: p.admin_assignments?.[0]?.role_id ?? null,
+    department_id: p.admin_assignments?.[0]?.department_id ?? null,
+  }));
 
   res.json(result);
 });
