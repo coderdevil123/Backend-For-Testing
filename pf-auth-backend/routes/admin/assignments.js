@@ -46,31 +46,39 @@ router.delete('/:email', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const { data, error } = await supabase
+  const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select(`
-      email,
-      name,
-      admin_assignments (
-        role_id,
-        department_id
-      )
-    `)
+    .select('email, name')
     .order('name');
 
-  if (error) {
-    console.error(error);
+  if (pErr) {
+    console.error(pErr);
+    return res.status(500).json({ error: 'Failed to load profiles' });
+  }
+
+  const { data: assignments, error: aErr } = await supabase
+    .from('admin_assignments')
+    .select('user_email, role_id, department_id')
+    .eq('is_active', true);
+
+  if (aErr) {
+    console.error(aErr);
     return res.status(500).json({ error: 'Failed to load assignments' });
   }
 
-  const normalized = data.map(p => ({
+  // 🔑 map assignments by email
+  const map = new Map(
+    assignments.map(a => [a.user_email, a])
+  );
+
+  const result = profiles.map(p => ({
     email: p.email,
     name: p.name,
-    role_id: p.admin_assignments?.[0]?.role_id ?? null,
-    department_id: p.admin_assignments?.[0]?.department_id ?? null,
+    role_id: map.get(p.email)?.role_id ?? null,
+    department_id: map.get(p.email)?.department_id ?? null,
   }));
 
-  res.json(normalized);
+  res.json(result);
 });
 
 module.exports = router;
