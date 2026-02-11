@@ -15,7 +15,7 @@ router.get('/', auth, async (req, res) => {
     .select(`
       *,
       meeting_summaries (
-        summary
+        full_report
       )
     `)
     .eq('assigned_to_email', userEmail)
