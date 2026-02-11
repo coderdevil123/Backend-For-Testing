@@ -1,11 +1,13 @@
 const express = require('express');
-const { requireAdmin } = require('../../services/adminAccess');
 
 const router = express.Router();
 
-// If request reaches here → user IS admin
-router.get('/me', requireAdmin, (req, res) => {
-  res.json({ isAdmin: true });
+// If request reaches here → user IS admin (middleware already passed)
+router.get('/', (req, res) => {
+  res.json({
+    isAdmin: true,
+    email: req.user.email,
+  });
 });
 
 module.exports = router;

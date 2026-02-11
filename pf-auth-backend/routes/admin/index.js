@@ -7,9 +7,9 @@ const router = express.Router();
 router.use(auth);         // 🔑 req.user
 router.use(requireAdmin); // 🔒 admin only
 
+router.use('/me', require('./me'));
 router.use('/roles', require('./roles'));
 router.use('/departments', require('./departments'));
 router.use('/assignments', require('./assignments'));
-router.use('/me', require('./me'));
 
 module.exports = router;

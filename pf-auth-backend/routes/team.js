@@ -61,17 +61,45 @@ router.get('/', auth, async (req, res) => {
 
 
 router.get('/public', async (req, res) => {
-  const { data, error } = await supabase
+  const { data: profiles } = await supabase
     .from('profiles')
-    .select(`id, email, name, avatar_url, bio, phone, mattermost, role, department`)
+    .select(`
+      id,
+      email,
+      name,
+      avatar_url,
+      bio,
+      phone,
+      mattermost,
+      role,
+      department
+    `)
     .order('name');
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
+  const { data: assignments } = await supabase
+    .from('admin_assignments')
+    .select('user_email, role_id, department_id')
+    .eq('is_active', true);
 
-  res.json(data);
+  const { data: roles } = await supabase
+    .from('roles')
+    .select('id, name');
+
+  const roleMap = new Map(roles.map(r => [r.id, r.name]));
+  const assignMap = new Map(assignments.map(a => [a.user_email, a]));
+
+  const result = profiles.map(p => {
+    const a = assignMap.get(p.email);
+    return {
+      ...p,
+      role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
+      department: a?.department_id || p.department || 'general',
+    };
+  });
+
+  res.json(result);
 });
+
 
 router.get('/me', auth, async (req, res) => {
   const { data, error } = await supabase
