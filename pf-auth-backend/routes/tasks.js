@@ -12,7 +12,12 @@ router.get('/', auth, async (req, res) => {
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('*')
+    .select(`
+      *,
+      meeting_summaries (
+        summary
+      )
+    `)
     .eq('assigned_to_email', userEmail)
     .order('created_at', { ascending: false });
 
@@ -21,7 +26,17 @@ router.get('/', auth, async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 
-  res.json(data);
+    const normalized = data.map(task => ({
+    ...task,
+    meeting_summary:
+      task.meeting_summaries?.summary
+        ? JSON.stringify(task.meeting_summaries.summary, null, 2)
+        : null,
+  }));
+
+  res.json(normalized);
+
+  // res.json(data);
 });
 
 /**
