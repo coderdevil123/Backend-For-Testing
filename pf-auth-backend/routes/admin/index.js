@@ -10,5 +10,6 @@ router.use(requireAdmin); // 🔒 admin only
 router.use('/roles', require('./roles'));
 router.use('/departments', require('./departments'));
 router.use('/assignments', require('./assignments'));
+router.use('/me', require('./me'));
 
 module.exports = router;
