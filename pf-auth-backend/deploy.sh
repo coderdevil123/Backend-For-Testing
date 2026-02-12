@@ -31,7 +31,7 @@ docker compose ps
 
 echo ""
 echo "🌐 Backend is live at:"
-echo "➡ http://10.10.10.57:8081"
+echo "➡ http://10.10.10.57:8082"
 echo ""
 echo "📝 Logs:"
 echo "➡ docker compose logs -f"
