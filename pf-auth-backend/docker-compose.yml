@@ -1,0 +1,30 @@
+services:
+  pf-auth-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pf-auth-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "3000"
+    networks:
+      - backend-network
+
+  pf-auth-nginx:
+    image: nginx:alpine
+    container_name: pf-auth-nginx
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - pf-auth-backend
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
