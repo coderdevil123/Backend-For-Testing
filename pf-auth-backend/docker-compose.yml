@@ -10,7 +10,7 @@ services:
     expose:
       - "3000"
     networks:
-      - backend-network
+      - pf-shared-network  # Changed from backend-network
 
   pf-auth-nginx:
     image: nginx:alpine
@@ -23,8 +23,9 @@ services:
     depends_on:
       - pf-auth-backend
     networks:
-      - backend-network
+      - pf-shared-network  # Changed from backend-network
 
 networks:
-  backend-network:
+  pf-shared-network:
     driver: bridge
+    name: pf-shared-network  # Explicit name so frontend can use it
