@@ -33,4 +33,24 @@ router.get('/tasks', auth, async (req, res) => {
   }
 });
 
+router.patch('/update-task-status', auth, async (req, res) => {
+  const { taskId, status } = req.body;
+
+  if (!taskId || !status) {
+    return res.status(400).json({ error: 'TaskId and status required' });
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ status })
+    .eq('id', taskId);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json({ success: true });
+});
+
+
 module.exports = router;

@@ -1,17 +1,17 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = function auth(req, res, next) {
+module.exports = function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'No token' });
   }
 
   const token = authHeader.split(' ')[1];
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // 👈 THIS is what your routes use
+    req.user = decoded;   // 👈 email, name sab yahin se
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' });
