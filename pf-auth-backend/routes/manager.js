@@ -8,40 +8,29 @@ const auth = require('../middlewares/auth');
  * Manager can see ALL tasks (filter frontend handles)
  */
 router.get('/tasks', auth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select(`
-      id,
-      title,
-      status,
-      priority,
-      created_at,
-      assigned_to_email,
-      profiles:assigned_to_email (
-        name,
-        department
-      )
-    `)
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        id,
+        title,
+        status,
+        priority,
+        created_at,
+        assigned_to_email
+      `)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Failed to fetch manager tasks' });
+    if (error) {
+      console.error('Manager task fetch error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Manager tasks crash:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  // normalize
-  const tasks = data.map(t => ({
-    id: t.id,
-    title: t.title,
-    status: t.status,
-    priority: t.priority,
-    created_at: t.created_at,
-    assigned_to_email: t.assigned_to_email,
-    assigned_to_name: t.profiles?.name,
-    department: t.profiles?.department,
-  }));
-
-  res.json(tasks);
 });
 
 module.exports = router;
