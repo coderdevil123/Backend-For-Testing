@@ -66,6 +66,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/admin', require('./routes/admin/index'));
+app.use('/api/manager', require('./routes/manager'));
 
 app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
