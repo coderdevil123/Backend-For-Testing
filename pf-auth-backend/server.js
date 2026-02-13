@@ -54,6 +54,7 @@ app.use(
   })
 );
 
+app.use(cookieParser());
 app.use(passport.initialize());
 
 app.use(express.json());
@@ -141,8 +142,15 @@ app.get(
     );
 
     const origin = req.session.oauth_origin || process.env.FRONTEND_URL;
-
     delete req.session.oauth_origin;
+
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: origin.startsWith('https'), // secure only for https
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      domain: origin.includes('growthsupercharged.com') ? '.growthsupercharged.com' : undefined
+    });
 
     res.redirect(`${origin}/oauth/success?token=${token}`);
   }

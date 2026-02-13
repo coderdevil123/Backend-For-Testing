@@ -12,6 +12,7 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
