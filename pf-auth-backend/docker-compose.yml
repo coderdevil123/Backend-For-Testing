@@ -28,4 +28,4 @@ services:
 networks:
   pf-shared-network:
     driver: bridge
-    name: pf-shared-network  # Explicit name so frontend can use it
+    name: pf-shared-network  # Explicit name so frontend can use 
