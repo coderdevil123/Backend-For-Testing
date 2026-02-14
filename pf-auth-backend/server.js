@@ -77,7 +77,7 @@ app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
 });
 
-app.get('/auth/google', passport.initialize(), (req, res, next) => {
+app.get('/auth/google', (req, res, next) => {
   const { origin } = req.query;
 
   const ALLOWED_ORIGINS = [
@@ -96,7 +96,7 @@ app.get('/auth/google', passport.initialize(), (req, res, next) => {
 });
 
 app.get(
-  '/auth/google/callback', passport.initialize(),
+  '/auth/google/callback',
   passport.authenticate('google', {
     session: false,
     failureRedirect: '/auth/failed',
