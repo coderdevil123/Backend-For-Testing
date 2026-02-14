@@ -13,24 +13,24 @@ const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
 const cron = require('node-cron');
 // const { runMattermostReader } = require('./services/mattermostReader');
-// const session = require('express-session');
+const session = require('express-session');
 
 // app.use(cors({
 //   origin: process.env.FRONTEND_URL,
 //   credentials: true,
 // }));
 
-// app.use(
-//   session({
-//     secret: process.env.JWT_SECRET,
-//     resave: false,
-//     saveUninitialized: false,
-//     cookie: {
-//       httpOnly: true,
-//       sameSite: 'lax',
-//     },
-//   })
-// );
+app.use(
+  session({
+    secret: process.env.JWT_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+    },
+  })
+);
 
 const ALLOWED_ORIGINS = [
   'https://pf-workspace.vercel.app',
@@ -54,9 +54,7 @@ app.use(
   })
 );
 
-// app.use(cookieParser());
 app.use(passport.initialize());
-
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68,10 +66,6 @@ app.use('/api/team', teamRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/admin', require('./routes/admin/index'));
-app.use('/api/manager', require('./routes/manager'));
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
 
 app.get('/auth/failed', (req, res) => {
   res.status(401).send('Google authentication failed');
@@ -146,15 +140,8 @@ app.get(
     );
 
     const origin = req.session.oauth_origin || process.env.FRONTEND_URL;
-    delete req.session.oauth_origin;
 
-    // res.cookie('auth_token', token, {
-    //   httpOnly: true,
-    //   secure: origin.startsWith('https'), // secure only for https
-    //   sameSite: 'lax',
-    //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    //   domain: origin.includes('growthsupercharged.com') ? '.growthsupercharged.com' : undefined
-    // });
+    delete req.session.oauth_origin;
 
     res.redirect(`${origin}/oauth/success?token=${token}`);
   }
