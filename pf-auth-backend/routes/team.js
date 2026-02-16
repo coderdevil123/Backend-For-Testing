@@ -43,6 +43,13 @@ router.get('/', auth, async (req, res) => {
     .select('id, name');
 
   const roleMap = new Map(roles.map(r => [r.id, r.name]));
+
+  const { data: departments } = await supabase
+    .from('departments')
+    .select('id, name');
+  
+  const deptMap = new Map(departments.map(d => [d.id, d.name]));
+
   const assignMap = new Map(assignments.map(a => [a.user_email, a]));
 
   // 4️⃣ Merge (ADMIN ASSIGNMENT OVERRIDES PROFILE)
@@ -52,7 +59,9 @@ router.get('/', auth, async (req, res) => {
     return {
       ...p,
       role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
-      department: a?.department_id || p.department || 'general',
+      department: a?.department_id
+      ? deptMap.get(a.department_id)
+      : p.department || 'general',
     };
   });
 
@@ -86,6 +95,12 @@ router.get('/public', async (req, res) => {
     .select('id, name');
 
   const roleMap = new Map(roles.map(r => [r.id, r.name]));
+
+  const { data: departments } = await supabase
+    .from('departments')
+    .select('id, name');
+  
+  const deptMap = new Map(departments.map(d => [d.id, d.name]));
   const assignMap = new Map(assignments.map(a => [a.user_email, a]));
 
   const result = profiles.map(p => {
@@ -93,7 +108,9 @@ router.get('/public', async (req, res) => {
     return {
       ...p,
       role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
-      department: a?.department_id || p.department || 'general',
+      department: a?.department_id
+      ? deptMap.get(a.department_id)
+      : p.department || 'general',
     };
   });
 
