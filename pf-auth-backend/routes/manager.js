@@ -9,7 +9,8 @@ const auth = require('../middlewares/auth');
  */
 router.get('/tasks', auth, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    // 1️⃣ Get tasks
+    const { data: tasks, error: tErr } = await supabase
       .from('tasks')
       .select(`
         id,
@@ -18,18 +19,36 @@ router.get('/tasks', auth, async (req, res) => {
         priority,
         created_at,
         assigned_to_email
-        profiles!tasks_assigned_to_email_fkey (
-          department
-        )
       `)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Manager task fetch error:', error);
-      return res.status(500).json({ error: error.message });
+    if (tErr) {
+      console.error(tErr);
+      return res.status(500).json({ error: tErr.message });
     }
 
-    res.json(data);
+    // 2️⃣ Get profiles
+    const { data: profiles, error: pErr } = await supabase
+      .from('profiles')
+      .select('email, department');
+
+    if (pErr) {
+      console.error(pErr);
+      return res.status(500).json({ error: pErr.message });
+    }
+
+    const profileMap = new Map(
+      profiles.map(p => [p.email, p.department])
+    );
+
+    // 3️⃣ Merge department into tasks
+    const result = tasks.map(task => ({
+      ...task,
+      department: profileMap.get(task.assigned_to_email) || null
+    }));
+
+    res.json(result);
+
   } catch (err) {
     console.error('Manager tasks crash:', err);
     res.status(500).json({ error: 'Server error' });
