@@ -9,7 +9,7 @@ const auth = require('../middlewares/auth');
  */
 router.get('/tasks', auth, async (req, res) => {
   try {
-    // 1️⃣ Get tasks
+    // 1️⃣ Get all tasks
     const { data: tasks, error: tErr } = await supabase
       .from('tasks')
       .select(`
@@ -23,29 +23,50 @@ router.get('/tasks', auth, async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (tErr) {
-      console.error(tErr);
+      console.error('Tasks error:', tErr);
       return res.status(500).json({ error: tErr.message });
     }
 
-    // 2️⃣ Get profiles
-    const { data: profiles, error: pErr } = await supabase
-      .from('profiles')
-      .select('email, department');
+    // 2️⃣ Get active admin assignments
+    const { data: assignments, error: aErr } = await supabase
+      .from('admin_assignments')
+      .select('user_email, department_id')
+      .eq('is_active', true);
 
-    if (pErr) {
-      console.error(pErr);
-      return res.status(500).json({ error: pErr.message });
+    if (aErr) {
+      console.error('Assignments error:', aErr);
+      return res.status(500).json({ error: aErr.message });
     }
 
-    const profileMap = new Map(
-      profiles.map(p => [p.email, p.department])
+    // 3️⃣ Get departments table
+    const { data: departments, error: dErr } = await supabase
+      .from('departments')
+      .select('id, name');
+
+    if (dErr) {
+      console.error('Departments error:', dErr);
+      return res.status(500).json({ error: dErr.message });
+    }
+
+    // 4️⃣ Create maps
+    const assignmentMap = new Map(
+      assignments.map(a => [a.user_email, a.department_id])
     );
 
-    // 3️⃣ Merge department into tasks
-    const result = tasks.map(task => ({
-      ...task,
-      department: profileMap.get(task.assigned_to_email) || null
-    }));
+    const departmentMap = new Map(
+      departments.map(d => [d.id, d.name])
+    );
+
+    // 5️⃣ Merge department into tasks
+    const result = tasks.map(task => {
+      const deptId = assignmentMap.get(task.assigned_to_email);
+      const deptName = deptId ? departmentMap.get(deptId) : null;
+
+      return {
+        ...task,
+        department: deptName || null
+      };
+    });
 
     res.json(result);
 
