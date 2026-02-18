@@ -53,16 +53,38 @@ router.get('/', auth, async (req, res) => {
   const assignMap = new Map(assignments.map(a => [a.user_email, a]));
 
   // 4️⃣ Merge (ADMIN ASSIGNMENT OVERRIDES PROFILE)
-  const result = profiles.map(p => {
+  const result = [];
+
+  // First: process all profiles (existing behavior)
+  profiles.forEach(p => {
     const a = assignMap.get(p.email);
 
-    return {
+    result.push({
       ...p,
       role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
       department: a?.department_id
-      ? deptMap.get(a.department_id)
-      : p.department || 'general',
-    };
+        ? deptMap.get(a.department_id)
+        : p.department || 'general',
+    });
+  });
+
+  // Second: add users who exist in admin_assignments but NOT in profiles
+  assignments.forEach(a => {
+    const alreadyExists = profiles.find(p => p.email === a.user_email);
+
+    if (!alreadyExists) {
+      result.push({
+        id: null,
+        email: a.user_email,
+        name: a.user_email, // fallback to email
+        avatar_url: null,
+        bio: null,
+        phone: null,
+        mattermost: null,
+        role: roleMap.get(a.role_id) || 'member',
+        department: deptMap.get(a.department_id) || 'general',
+      });
+    }
   });
 
   res.json(result);
