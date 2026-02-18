@@ -4,22 +4,23 @@ const { supabase } = require('../lib/supabase');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
+const auth = require('../middlewares/auth');
 
 /* 🔐 Middleware */
-function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
+// function requireAuth(req, res, next) {
+//   const token = req.headers.authorization?.split(' ')[1];
+//   if (!token) return res.status(401).json({ error: 'No token' });
 
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
+//   try {
+//     req.user = jwt.verify(token, process.env.JWT_SECRET);
+//     next();
+//   } catch {
+//     res.status(401).json({ error: 'Invalid token' });
+//   }
+// }
 
 /* ✅ GET profile */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   const { email } = req.user;
 
   const { data, error } = await supabase
@@ -33,7 +34,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /* ✅ UPDATE profile */
-router.put('/', requireAuth, async (req, res) => {
+router.put('/', auth, async (req, res) => {
   const { email } = req.user;
   const body = req.body || {};
   const { name, phone, bio, location, avatar_url, mattermost } = body;
@@ -63,7 +64,7 @@ router.put('/', requireAuth, async (req, res) => {
 
 });
 
-router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
     const { email } = req.user;
     const file = req.file;
 

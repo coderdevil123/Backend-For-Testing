@@ -80,6 +80,8 @@ const NodeCache = require('node-cache');
 const cache = new NodeCache({ stdTTL: 60 });
 
 router.get('/tasks', auth, async (req, res) => {
+  const cached = cache.get('manager_tasks');
+  if (cached) return res.json(cached);
   try {
 
     const [tasksRes, assignRes, deptRes] = await Promise.all([
@@ -128,7 +130,7 @@ router.get('/tasks', auth, async (req, res) => {
         department: deptName || null
       };
     });
-
+    cache.set('manager_tasks', result);
     res.json(result);
 
   } catch (err) {
@@ -152,7 +154,7 @@ router.patch('/update-task-status', auth, async (req, res) => {
   if (error) {
     return res.status(500).json({ error: error.message });
   }
-
+  cache.del('manager_tasks');
   res.json({ success: true });
 });
 

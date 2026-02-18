@@ -5,39 +5,37 @@ const router = express.Router();
 const auth = require('../middlewares/auth');
 
 router.get('/', auth, async (req, res) => {
-  const userEmail = req.user.email;
+  try {
+    const userEmail = req.user.email;
 
-  // 1️⃣ Get announcements with READ status
-  const { data: announcements, error } = await supabase.rpc(
-    'get_announcements_with_read_status',
-    { user_email: userEmail }
-  );
+    const [annRes, pinRes] = await Promise.all([
+      supabase.rpc('get_announcements_with_read_status', {
+        user_email: userEmail
+      }),
+      supabase
+        .from('announcement_pins')
+        .select('announcement_id')
+        .eq('user_email', userEmail)
+    ]);
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
+    if (annRes.error || pinRes.error) {
+      return res.status(500).json({ error: 'Failed to load announcements' });
+    }
+
+    const pinnedSet = new Set(
+      (pinRes.data || []).map(p => p.announcement_id)
+    );
+
+    const enriched = (annRes.data || []).map(a => ({
+      ...a,
+      is_pinned: pinnedSet.has(a.id),
+    }));
+
+    res.json(enriched);
+
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
   }
-
-  // 2️⃣ Get pins for this user
-  const { data: pins, error: pinError } = await supabase
-    .from('announcement_pins')
-    .select('announcement_id')
-    .eq('user_email', userEmail);
-
-  if (pinError) {
-    return res.status(500).json({ error: pinError.message });
-  }
-
-  const pinnedSet = new Set(
-    (pins || []).map(p => p.announcement_id)
-  );
-
-  // 3️⃣ Attach is_pinned per announcement
-  const enriched = (announcements || []).map(a => ({
-    ...a,
-    is_pinned: pinnedSet.has(a.id),
-  }));
-
-  res.json(enriched);
 });
 
 router.post('/', auth, async (req, res) => {

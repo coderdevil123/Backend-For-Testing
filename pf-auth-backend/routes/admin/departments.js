@@ -1,19 +1,20 @@
 const express = require('express');
 const { supabase } = require('../../lib/supabase');
+const auth = require('../../middlewares/auth');
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   const { data, error } = await supabase
     .from('departments')
     .select('*')
     .order('name');
 
   if (error) return res.status(500).json(error);
-  res.json(data);
+  res.json(data || []);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
   const { name } = req.body;
 
   if (!name) {
@@ -29,7 +30,7 @@ router.post('/', async (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   const { error } = await supabase
     .from('departments')
     .delete()
