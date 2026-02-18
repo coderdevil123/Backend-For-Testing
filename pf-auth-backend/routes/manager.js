@@ -7,48 +7,107 @@ const auth = require('../middlewares/auth');
  * GET /api/manager/tasks
  * Manager can see ALL tasks (filter frontend handles)
  */
+// router.get('/tasks', auth, async (req, res) => {
+//   try {
+//     // 1️⃣ Get all tasks
+//     const { data: tasks, error: tErr } = await supabase
+//       .from('tasks')
+//       .select(`
+//         id,
+//         title,
+//         status,
+//         priority,
+//         created_at,
+//         assigned_to_email
+//       `)
+//       .order('created_at', { ascending: false });
+
+//     if (tErr) {
+//       console.error('Tasks error:', tErr);
+//       return res.status(500).json({ error: tErr.message });
+//     }
+
+//     // 2️⃣ Get active admin assignments
+//     const { data: assignments, error: aErr } = await supabase
+//       .from('admin_assignments')
+//       .select('user_email, department_id')
+//       .eq('is_active', true);
+
+//     if (aErr) {
+//       console.error('Assignments error:', aErr);
+//       return res.status(500).json({ error: aErr.message });
+//     }
+
+//     // 3️⃣ Get departments table
+//     const { data: departments, error: dErr } = await supabase
+//       .from('departments')
+//       .select('id, name');
+
+//     if (dErr) {
+//       console.error('Departments error:', dErr);
+//       return res.status(500).json({ error: dErr.message });
+//     }
+
+//     // 4️⃣ Create maps
+//     const assignmentMap = new Map(
+//       assignments.map(a => [a.user_email, a.department_id])
+//     );
+
+//     const departmentMap = new Map(
+//       departments.map(d => [d.id, d.name])
+//     );
+
+//     // 5️⃣ Merge department into tasks
+//     const result = tasks.map(task => {
+//       const deptId = assignmentMap.get(task.assigned_to_email);
+//       const deptName = deptId ? departmentMap.get(deptId) : null;
+
+//       return {
+//         ...task,
+//         department: deptName || null
+//       };
+//     });
+
+//     res.json(result);
+
+//   } catch (err) {
+//     console.error('Manager tasks crash:', err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// });
+
 router.get('/tasks', auth, async (req, res) => {
   try {
-    // 1️⃣ Get all tasks
-    const { data: tasks, error: tErr } = await supabase
-      .from('tasks')
-      .select(`
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        assigned_to_email
-      `)
-      .order('created_at', { ascending: false });
 
-    if (tErr) {
-      console.error('Tasks error:', tErr);
-      return res.status(500).json({ error: tErr.message });
-    }
+    const [tasksRes, assignRes, deptRes] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('id,title,status,priority,created_at,assigned_to_email')
+        .order('created_at', { ascending: false }),
 
-    // 2️⃣ Get active admin assignments
-    const { data: assignments, error: aErr } = await supabase
-      .from('admin_assignments')
-      .select('user_email, department_id')
-      .eq('is_active', true);
+      supabase
+        .from('admin_assignments')
+        .select('user_email, department_id')
+        .eq('is_active', true),
 
-    if (aErr) {
-      console.error('Assignments error:', aErr);
-      return res.status(500).json({ error: aErr.message });
-    }
+      supabase
+        .from('departments')
+        .select('id, name')
+    ]);
 
-    // 3️⃣ Get departments table
-    const { data: departments, error: dErr } = await supabase
-      .from('departments')
-      .select('id, name');
+    if (tasksRes.error)
+      return res.status(500).json({ error: tasksRes.error.message });
 
-    if (dErr) {
-      console.error('Departments error:', dErr);
-      return res.status(500).json({ error: dErr.message });
-    }
+    if (assignRes.error)
+      return res.status(500).json({ error: assignRes.error.message });
 
-    // 4️⃣ Create maps
+    if (deptRes.error)
+      return res.status(500).json({ error: deptRes.error.message });
+
+    const tasks = tasksRes.data;
+    const assignments = assignRes.data;
+    const departments = deptRes.data;
+
     const assignmentMap = new Map(
       assignments.map(a => [a.user_email, a.department_id])
     );
@@ -57,7 +116,6 @@ router.get('/tasks', auth, async (req, res) => {
       departments.map(d => [d.id, d.name])
     );
 
-    // 5️⃣ Merge department into tasks
     const result = tasks.map(task => {
       const deptId = assignmentMap.get(task.assigned_to_email);
       const deptName = deptId ? departmentMap.get(deptId) : null;
