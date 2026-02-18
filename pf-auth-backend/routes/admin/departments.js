@@ -29,6 +29,16 @@ router.post('/', async (req, res) => {
   res.json({ success: true });
 });
 
+router.delete('/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('departments')
+    .delete()
+    .eq('id', req.params.id);
+
+  if (error) return res.status(500).json(error);
+  res.json({ success: true });
+});
+
 module.exports = router;
 
 // const express = require('express');
@@ -62,14 +72,6 @@ module.exports = router;
 //   res.json({ success: true });
 // });
 
-// router.delete('/:id', auth, async (req, res) => {
-//   const { error } = await supabase
-//     .from('departments')
-//     .delete()
-//     .eq('id', req.params.id);
 
-//   if (error) return res.status(500).json(error);
-//   res.json({ success: true });
-// });
 
 // module.exports = router;
