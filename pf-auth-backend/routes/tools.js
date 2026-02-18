@@ -1,23 +1,24 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../lib/supabase');
+const auth = require('../middlewares/auth');
 
 const router = express.Router();
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 /* 🔐 Auth middleware */
-function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
+// function requireAuth(req, res, next) {
+//   const token = req.headers.authorization?.split(' ')[1];
+//   if (!token) return res.status(401).json({ error: 'No token' });
 
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-}
+//   try {
+//     req.user = jwt.verify(token, process.env.JWT_SECRET);
+//     next();
+//   } catch {
+//     res.status(401).json({ error: 'Invalid token' });
+//   }
+// }
 
 /* ✅ GET all tools */
 router.get('/', async (req, res) => {
@@ -33,7 +34,7 @@ router.get('/', async (req, res) => {
 /* ✅ ADD tool */
 router.post(
   '/',
-  requireAuth,
+  auth,
   upload.single('image'),
   async (req, res) => {
     const {
@@ -87,7 +88,7 @@ router.post(
   }
 );
 
-router.put('/:id', requireAuth, upload.single('image'), async (req, res) => {
+router.put('/:id', auth, upload.single('image'), async (req, res) => {
   const { id } = req.params;
   const {
     name,
@@ -143,7 +144,7 @@ router.put('/:id', requireAuth, upload.single('image'), async (req, res) => {
   res.json({ success: true });
 });
 
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   const { id } = req.params;
 
   const { error } = await supabase
