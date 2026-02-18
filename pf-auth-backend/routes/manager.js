@@ -76,6 +76,9 @@ const auth = require('../middlewares/auth');
 //   }
 // });
 
+const NodeCache = require('node-cache');
+const cache = new NodeCache({ stdTTL: 60 });
+
 router.get('/tasks', auth, async (req, res) => {
   try {
 
