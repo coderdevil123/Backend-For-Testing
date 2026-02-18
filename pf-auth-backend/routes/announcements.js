@@ -46,7 +46,8 @@ router.post('/', auth, async (req, res) => {
     content,
     category,
     recipients,
-    taggedEmails
+    tagged_emails,
+    related_task_id
   } = req.body;
 
   const creatorName =
@@ -59,7 +60,8 @@ router.post('/', auth, async (req, res) => {
       content,
       category,
       recipients,
-      tagged_emails: recipients === 'specific' ? taggedEmails : null,
+      tagged_emails: recipients === 'specific' ? tagged_emails : null,
+      related_task_id: related_task_id || null,
       created_by: req.user.email,
       created_by_name: creatorName,
     });
