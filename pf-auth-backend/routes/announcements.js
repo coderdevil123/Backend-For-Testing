@@ -50,6 +50,16 @@ router.post('/', auth, async (req, res) => {
     related_task_id
   } = req.body;
 
+  if (!title || !content || !recipients) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (recipients === 'specific') {
+    if (!Array.isArray(tagged_emails) || tagged_emails.length === 0) {
+      return res.status(400).json({ error: 'Tagged emails required' });
+    }
+  }
+
   const creatorName =
     req.user.name || req.user.email.split('@')[0];
 
@@ -67,6 +77,7 @@ router.post('/', auth, async (req, res) => {
     });
 
   if (error) {
+    console.error('Announcement insert error:', error);
     return res.status(500).json({ error: error.message });
   }
 

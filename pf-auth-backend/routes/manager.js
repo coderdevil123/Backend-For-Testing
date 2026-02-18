@@ -18,7 +18,13 @@ router.get('/tasks', auth, async (req, res) => {
         status,
         priority,
         created_at,
-        assigned_to_email
+        assigned_to_email,
+        admin_assignments!tasks_assigned_to_email_fkey (
+          department_id,
+          departments (
+            name
+          )
+        )
       `)
       .order('created_at', { ascending: false });
 
