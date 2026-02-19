@@ -75,43 +75,43 @@ const auth = require('../middlewares/auth');
 //     res.status(500).json({ error: 'Server error' });
 //   }
 // });
-
-const NodeCache = require('node-cache');
-const cache = new NodeCache({ stdTTL: 60 });
+const cache = require('../services/cache');
 
 router.get('/tasks', auth, async (req, res) => {
-  const cached = cache.get('manager_tasks');
-  if (cached) return res.json(cached);
   try {
+    const cached = cache.get('manager_tasks');
+    if (cached) return res.json(cached);
 
-    const [tasksRes, assignRes, deptRes] = await Promise.all([
-      supabase
-        .from('tasks')
-        .select('id,title,status,priority,created_at,assigned_to_email')
-        .order('created_at', { ascending: false }),
+    const { data: tasks, error: tErr } = await supabase
+      .from('tasks')
+      .select('id,title,status,priority,created_at,assigned_to_email')
+      .order('created_at', { ascending: false })
+      .limit(200);   // 🔥 IMPORTANT (never unlimited)
 
-      supabase
+    if (tErr)
+      return res.status(500).json({ error: tErr.message });
+
+    let assignments = cache.get('assignments');
+    let departments = cache.get('departments');
+
+    if (!assignments) {
+      const { data } = await supabase
         .from('admin_assignments')
         .select('user_email, department_id')
-        .eq('is_active', true),
+        .eq('is_active', true);
 
-      supabase
+      assignments = data;
+      cache.set('assignments', data);
+    }
+
+    if (!departments) {
+      const { data } = await supabase
         .from('departments')
-        .select('id, name')
-    ]);
+        .select('id, name');
 
-    if (tasksRes.error)
-      return res.status(500).json({ error: tasksRes.error.message });
-
-    if (assignRes.error)
-      return res.status(500).json({ error: assignRes.error.message });
-
-    if (deptRes.error)
-      return res.status(500).json({ error: deptRes.error.message });
-
-    const tasks = tasksRes.data;
-    const assignments = assignRes.data;
-    const departments = deptRes.data;
+      departments = data;
+      cache.set('departments', data);
+    }
 
     const assignmentMap = new Map(
       assignments.map(a => [a.user_email, a.department_id])
@@ -121,16 +121,15 @@ router.get('/tasks', auth, async (req, res) => {
       departments.map(d => [d.id, d.name])
     );
 
-    const result = tasks.map(task => {
-      const deptId = assignmentMap.get(task.assigned_to_email);
-      const deptName = deptId ? departmentMap.get(deptId) : null;
+    const result = tasks.map(task => ({
+      ...task,
+      department: departmentMap.get(
+        assignmentMap.get(task.assigned_to_email)
+      ) || null
+    }));
 
-      return {
-        ...task,
-        department: deptName || null
-      };
-    });
     cache.set('manager_tasks', result);
+
     res.json(result);
 
   } catch (err) {
