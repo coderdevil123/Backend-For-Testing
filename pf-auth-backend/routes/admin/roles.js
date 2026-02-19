@@ -1,20 +1,22 @@
 const express = require('express');
 const { supabase } = require('../../lib/supabase');
+const cache = require('../../services/cache');
 
 const router = express.Router();
 
 // GET all roles
 router.get('/', async (req, res) => {
+  const cached = cache.get('roles');
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('roles')
     .select('*')
     .order('name');
 
-  if (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Failed to fetch roles' });
-  }
+  if (error) return res.status(500).json({ error: 'Failed to fetch roles' });
 
+  cache.set('roles', data);
   res.json(data);
 });
 

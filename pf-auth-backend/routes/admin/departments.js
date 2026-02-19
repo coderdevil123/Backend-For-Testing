@@ -1,17 +1,23 @@
 const express = require('express');
 const { supabase } = require('../../lib/supabase');
 const auth = require('../../middlewares/auth');
+const cache = require('../../services/cache');
 
 const router = express.Router();
 
-router.get('/', auth, async (req, res) => {
+router.get('/', async (req, res) => {
+  const cached = cache.get('departments');
+  if (cached) return res.json(cached);
+
   const { data, error } = await supabase
     .from('departments')
     .select('*')
     .order('name');
 
   if (error) return res.status(500).json(error);
-  res.json(data || []);
+
+  cache.set('departments', data);
+  res.json(data);
 });
 
 router.post('/', auth, async (req, res) => {

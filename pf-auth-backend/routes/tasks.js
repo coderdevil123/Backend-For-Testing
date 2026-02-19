@@ -26,7 +26,7 @@ router.get('/', auth, async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch tasks' });
   }
 
-    const normalized = data.map(task => ({
+    const normalized = (data || []).map(task => ({
     ...task,
     meeting_summary:
       task.meeting_summaries?.summary

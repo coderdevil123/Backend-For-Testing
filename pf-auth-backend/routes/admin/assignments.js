@@ -1,6 +1,6 @@
 const express = require('express');
 const { supabase } = require('../../lib/supabase');
-
+const cache = require('../../services/cache');
 const router = express.Router();
 
 // Assign role
@@ -46,6 +46,9 @@ router.delete('/:email', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
+  const cached = cache.get('assignments');
+  if (cached) return res.json(cached);
+
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
     .select('email, name')
@@ -78,6 +81,7 @@ router.get('/', async (req, res) => {
     department_id: map.get(p.email)?.department_id ?? null,
   }));
 
+  cache.set('assignments', result);
   res.json(result);
 });
 
