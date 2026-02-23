@@ -175,12 +175,19 @@ const teamRoutes = require('./routes/team');
 const profileRoutes = require('./routes/profile');
 const toolsRoutes = require('./routes/tools');
 const tasksRoutes = require('./routes/tasks');
+const { warmCache, startKeepAlive } = require('./services/cacheWarmer');
 
 const ALLOWED_ORIGINS = [
   'https://pf-workspace.vercel.app',
   'http://10.10.10.57:8090',
   'https://pf.growthsupercharged.com',
 ];
+
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  await warmCache();
+  startKeepAlive();
+});
 
 app.use(
   cors({
