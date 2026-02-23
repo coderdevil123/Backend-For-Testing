@@ -183,12 +183,6 @@ const ALLOWED_ORIGINS = [
   'https://pf.growthsupercharged.com',
 ];
 
-app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
-  await warmCache();
-  startKeepAlive();
-});
-
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -284,7 +278,8 @@ app.get('/', (req, res) => {
   res.send('PF Auth Server Running');
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Auth server running on port ${PORT}`);
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  await warmCache();
+  startKeepAlive();
 });
