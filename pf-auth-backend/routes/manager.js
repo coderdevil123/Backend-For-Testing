@@ -4,7 +4,7 @@ const { supabase } = require('../lib/supabase');
 const auth  = require('../middlewares/auth');
 const cache = require('../services/cache');
 
-// ── GET /api/manager/tasks ───────────────────────────────────────────────────
+// ── GET /api/manager/tasks
 router.get('/tasks', auth, async (req, res) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page  || '1'));
@@ -15,7 +15,7 @@ router.get('/tasks', auth, async (req, res) => {
     const { status, department, memberEmail, search, dateFilter } = req.query;
     const isUnfiltered = !status && !department && !memberEmail && !search && !dateFilter;
 
-    // ── Serve from cache on unfiltered page 1 ───────────────────────────────
+    // ── Serve from cache on unfiltered page 1
     if (page === 1 && isUnfiltered) {
       const cached = cache.getManagerTasks();
       if (cached) return res.json(cached);
