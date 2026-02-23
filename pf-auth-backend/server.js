@@ -278,8 +278,7 @@ app.get('/', (req, res) => {
   res.send('PF Auth Server Running');
 });
 
-app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
-  await warmCache();
-  startKeepAlive();
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Auth server running on port ${PORT}`);
 });
