@@ -6,7 +6,14 @@ const router   = express.Router();
 router.get('/', async (req, res) => {
   try {
     const cached = cache.getRoles();
-    if (cached) return res.json(cached);
+
+    // Bust cache if descriptions are missing from cached data
+    if (cached) {
+      const hasMissingDesc = cached.every(r => r.description === undefined);
+      if (!hasMissingDesc) return res.json(cached);
+      // else fall through to re-fetch
+      cache.delRoles();
+    }
 
     const { data, error } = await supabase
       .from('roles')

@@ -106,19 +106,26 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', auth, async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'Missing department name' });
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Missing department name' });
 
-  const { error } = await supabase.from('departments').insert({
-    name,
-    created_by: req.user.email,
-  });
+    const { error } = await supabase
+      .from('departments')
+      .insert({ name: name.trim() }); // ← removed created_by
 
-  if (error) return res.status(500).json(error);
+    if (error) {
+      console.error('Department insert error:', error.message);
+      return res.status(500).json({ error: error.message }); // ← log actual error
+    }
 
-  cache.delDepartments();
-  cache.delTeam();
-  res.json({ success: true });
+    cache.delDepartments();
+    cache.delTeam();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST dept crash:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/:id', auth, async (req, res) => {
