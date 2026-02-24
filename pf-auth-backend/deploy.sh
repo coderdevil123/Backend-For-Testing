@@ -9,7 +9,7 @@ echo "🚀 Starting backend deployment..."
 
 # Pull latest changes
 echo "📥 Pulling latest code from GitHub..."
-git pull origin main || echo "⚠️  Git pull skipped (local changes)"
+git pull origin main || git pull origin feature/local-postgres-migration || echo "⚠️  Git pull skipped (local changes)"
 
 # Stop running containers
 echo "🛑 Stopping existing backend containers..."
