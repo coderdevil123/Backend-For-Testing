@@ -1,67 +1,62 @@
-const express = require('express');
-const db = require('../../lib/db');
-const cache = require('../../services/cache');
-const router = express.Router();
+const express  = require('express');
+const { supabase } = require('../../lib/supabase');
+const cache    = require('../../services/cache');
+const router   = express.Router();
 
-// GET roles
 router.get('/', async (req, res) => {
   try {
     const cached = cache.getRoles();
     if (cached) return res.json(cached);
 
-    const { rows } = await db.query(
-      'SELECT * FROM roles ORDER BY name ASC'
-    );
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, name, description')
+      .order('name');
 
-    cache.setRoles(rows);
-    res.json(rows);
-
+    if (error) return res.status(500).json({ error: error.message });
+    cache.setRoles(data);
+    res.json(data);
   } catch (err) {
-    console.error('Fetch roles error:', err);
-    res.status(500).json({ error: 'Failed to fetch roles' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// CREATE role
 router.post('/', async (req, res) => {
   try {
     const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'Role name is required' });
 
-    if (!name)
-      return res.status(400).json({ error: 'Role name is required' });
+    const { error } = await supabase
+      .from('roles')
+      .insert({ name: name.trim(), description: description?.trim() || null });
 
-    await db.query(
-      'INSERT INTO roles (name, description) VALUES ($1, $2)',
-      [name, description || null]
-    );
+    if (error) {
+      console.error('Insert role error:', error);
+      return res.status(500).json({ error: error.message }); // ← returns actual error message
+    }
 
     cache.delRoles();
     cache.delTeam();
-
     res.json({ success: true });
-
   } catch (err) {
-    console.error('Create role error:', err);
-    res.status(500).json({ error: 'Failed to create role' });
+    console.error('POST roles crash:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE role
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query(
-      'DELETE FROM roles WHERE id = $1',
-      [req.params.id]
-    );
+    const { error } = await supabase
+      .from('roles')
+      .delete()
+      .eq('id', req.params.id);
 
+    if (error) return res.status(500).json({ error: error.message });
     cache.delRoles();
     cache.delTeam();
-
     res.json({ success: true });
-
   } catch (err) {
-    console.error('Delete role error:', err);
-    res.status(500).json({ error: 'Failed to delete role' });
+    res.status(500).json({ error: err.message });
   }
 });
 
