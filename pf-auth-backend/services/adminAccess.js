@@ -1,37 +1,48 @@
 const { supabase } = require('../lib/supabase');
+const cache = require('./cache');
 
 async function requireAdmin(req, res, next) {
   try {
     const email = req.user.email;
 
-    const { data, error } = await supabase
+    // ── Check team cache first (already has enriched roles) — zero DB cost ───
+    const team = cache.getTeam();
+    if (team) {
+      const me = team.find(m => m.email === email);
+      if (me?.role === 'admin') return next();
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // ── Cache miss: fetch assignment + role name in parallel ─────────────────
+    const { data: assignment } = await supabase
       .from('admin_assignments')
       .select('role_id')
       .eq('user_email', email)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (error) {
-      console.error('Admin check error:', error);
+    if (!assignment?.role_id) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    if (!data || !data.role_id) {
+    // ── Check cached roles list before hitting DB ────────────────────────────
+    const cachedRoles = cache.getRoles();
+    if (cachedRoles) {
+      const role = cachedRoles.find(r => r.id === assignment.role_id);
+      if (role?.name === 'admin') return next();
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    // Now check role name separately (safer)
+    // ── Last resort: DB lookup ───────────────────────────────────────────────
     const { data: role } = await supabase
       .from('roles')
       .select('name')
-      .eq('id', data.role_id)
+      .eq('id', assignment.role_id)
       .maybeSingle();
 
-    if (!role || role.name !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
+    if (role?.name === 'admin') return next();
+    return res.status(403).json({ error: 'Admin access required' });
 
-    next();
   } catch (err) {
     console.error('Admin middleware crash:', err);
     return res.status(403).json({ error: 'Admin access required' });
