@@ -1,49 +1,68 @@
 const express = require('express');
-const { supabase } = require('../../lib/db');
+const db = require('../../lib/db');
 const cache = require('../../services/cache');
 const router = express.Router();
 
+// GET roles
 router.get('/', async (req, res) => {
-  const cached = cache.getRoles();
-  if (cached) return res.json(cached);
+  try {
+    const cached = cache.getRoles();
+    if (cached) return res.json(cached);
 
-  const { rows } = await db.query(
-    'SELECT * FROM roles ORDER BY name ASC'
-  );
-  const data = rows;
+    const { rows } = await db.query(
+      'SELECT * FROM roles ORDER BY name ASC'
+    );
 
-  if (error) return res.status(500).json({ error: 'Failed to fetch roles' });
+    cache.setRoles(rows);
+    res.json(rows);
 
-  cache.setRoles(data);
-  res.json(data);
+  } catch (err) {
+    console.error('Fetch roles error:', err);
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
 });
 
+// CREATE role
 router.post('/', async (req, res) => {
-  const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: 'Role name is required' });
+  try {
+    const { name, description } = req.body;
 
-    const { error } = await db.query(
+    if (!name)
+      return res.status(400).json({ error: 'Role name is required' });
+
+    await db.query(
       'INSERT INTO roles (name, description) VALUES ($1, $2)',
       [name, description || null]
     );
 
-  if (error) return res.status(500).json({ error: 'Failed to create role' });
+    cache.delRoles();
+    cache.delTeam();
 
-  cache.delRoles();
-  cache.delTeam(); // team data includes role names
-  res.json({ success: true });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Create role error:', err);
+    res.status(500).json({ error: 'Failed to create role' });
+  }
 });
 
+// DELETE role
 router.delete('/:id', async (req, res) => {
-  const { error } = await db.query(
-    'DELETE FROM roles WHERE id = $1',
-    [req.params.id]
-  );
-  if (error) return res.status(500).json({ error: 'Failed to delete role' });
+  try {
+    await db.query(
+      'DELETE FROM roles WHERE id = $1',
+      [req.params.id]
+    );
 
-  cache.delRoles();
-  cache.delTeam();
-  res.json({ success: true });
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Delete role error:', err);
+    res.status(500).json({ error: 'Failed to delete role' });
+  }
 });
 
 module.exports = router;
