@@ -1,57 +1,87 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const { supabase } = require('../lib/supabase');
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
-const router = express.Router();
-const auth = require('../middlewares/auth');
+const db      = require('../lib/db');
+const multer  = require('multer');
+const path    = require('path');
+const fs      = require('fs');
+const router  = express.Router();
+const auth    = require('../middlewares/auth');
 
-/* ✅ GET profile */
+// ── Setup avatar upload directory
+const avatarDir = path.join(__dirname, '../uploads/avatars');
+
+if (!fs.existsSync(avatarDir)) {
+  fs.mkdirSync(avatarDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: avatarDir,
+  filename: (req, file, cb) => {
+    const email = req.user.email;
+    const ext = file.originalname.split('.').pop();
+    cb(null, `${email}.${ext}`);
+  }
+});
+
+const upload = multer({ storage });
+
+/* ── GET /api/profile */
 router.get('/', auth, async (req, res) => {
-  const { email } = req.user;
+  try {
+    const { email } = req.user;
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('email', email)
-    .single();
+    const { rows } = await db.query(
+      `SELECT * FROM profiles WHERE email = $1`,
+      [email]
+    );
 
-  if (error) return res.status(500).json(error);
-  res.json(data);
+    if (!rows.length) {
+      return res.status(500).json({ error: 'Profile not found' });
+    }
+
+    res.json(rows[0]);
+
+  } catch (err) {
+    console.error('Fetch profile error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-/* ✅ UPDATE profile */
+/* ── PUT /api/profile */
 router.put('/', auth, async (req, res) => {
-  const { email } = req.user;
-  const body = req.body || {};
-  const { name, phone, bio, location, avatar_url, mattermost } = body;
+  try {
+    const { email } = req.user;
+    const { name, phone, bio, location, avatar_url, mattermost } = req.body || {};
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      name,
-      phone,
-      bio,
-      location,
-      avatar_url,
-      mattermost,
-    })
-    .eq('email', email);
+    await db.query(
+      `
+      UPDATE profiles
+      SET name=$1,
+          phone=$2,
+          bio=$3,
+          location=$4,
+          avatar_url=$5,
+          mattermost=$6
+      WHERE email=$7
+      `,
+      [name, phone, bio, location, avatar_url, mattermost, email]
+    );
 
-  if (error) return res.status(500).json(error);
-    const { data: updatedProfile, error: fetchError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('email', email)
-    .single();
+    const { rows } = await db.query(
+      `SELECT * FROM profiles WHERE email=$1`,
+      [email]
+    );
 
-    if (fetchError) return res.status(500).json(fetchError);
+    res.json(rows[0]);
 
-    res.json(updatedProfile);
-
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Update failed' });
+  }
 });
 
+/* ── POST /api/profile/avatar */
 router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+  try {
     const { email } = req.user;
     const file = req.file;
 
@@ -59,30 +89,19 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const ext = file.originalname.split('.').pop();
-    const path = `avatars/${email}.${ext}`;
+    const avatarPath = `/uploads/avatars/${file.filename}`;
 
-    const { error } = await supabase.storage
-      .from('avatars')
-      .upload(path, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true,
-      });
+    await db.query(
+      `UPDATE profiles SET avatar_url=$1 WHERE email=$2`,
+      [avatarPath, email]
+    );
 
-    if (error) return res.status(500).json(error);
+    res.json({ avatar_url: avatarPath });
 
-    const { data } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(path);
-
-    await supabase
-      .from('profiles')
-      .update({ avatar_url: data.publicUrl })
-      .eq('email', email);
-
-    res.json({ avatar_url: data.publicUrl });
+  } catch (err) {
+    console.error('Avatar upload error:', err);
+    res.status(500).json({ error: 'Avatar upload failed' });
   }
-);
-
+});
 
 module.exports = router;

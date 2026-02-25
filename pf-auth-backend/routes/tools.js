@@ -1,252 +1,155 @@
-// const express = require('express');
-// const jwt = require('jsonwebtoken');
-// const { supabase } = require('../lib/supabase');
-// const auth = require('../middlewares/auth');
-
-// const router = express.Router();
-// const multer = require('multer');
-// const upload = multer({ storage: multer.memoryStorage() });
-
-// /* 🔐 Auth middleware */
-// // function requireAuth(req, res, next) {
-// //   const token = req.headers.authorization?.split(' ')[1];
-// //   if (!token) return res.status(401).json({ error: 'No token' });
-
-// //   try {
-// //     req.user = jwt.verify(token, process.env.JWT_SECRET);
-// //     next();
-// //   } catch {
-// //     res.status(401).json({ error: 'Invalid token' });
-// //   }
-// // }
-
-// /* ✅ GET all tools */
-// router.get('/', async (req, res) => {
-//   const { data, error } = await supabase
-//     .from('tools')
-//     .select('*')
-//     .order('created_at', { ascending: false });
-
-//   if (error) return res.status(500).json(error);
-//   res.json(data);
-// });
-
-// /* ✅ ADD tool */
-// router.post(
-//   '/',
-//   auth,
-//   upload.single('image'),
-//   async (req, res) => {
-//     const {
-//       name,
-//       description,
-//       url,
-//       category,
-//       tutorial_video,
-//     } = req.body;
-
-//     if (!name || !url || !category) {
-//       return res.status(400).json({ error: 'Missing required fields' });
-//     }
-
-//     let imageUrl = null;
-
-//     if (req.file) {
-//       const filePath = `tools/${Date.now()}-${req.file.originalname}`;
-
-//       const { error: uploadError } = await supabase.storage
-//         .from('tool-images')
-//         .upload(filePath, req.file.buffer, {
-//           contentType: req.file.mimetype,
-//           upsert: true,
-//         });
-
-//       if (uploadError) {
-//         return res.status(500).json(uploadError);
-//       }
-
-//       imageUrl = supabase.storage
-//         .from('tool-images')
-//         .getPublicUrl(filePath).data.publicUrl;
-//     }
-
-//     const { error } = await supabase.from('tools').insert({
-//       name,
-//       description,
-//       url,
-//       category,
-//       tutorial_video,
-//       image: imageUrl,
-//       image_light: imageUrl,
-//       image_dark: imageUrl,
-//       created_by: req.user.email,
-//     });
-
-//     if (error) return res.status(500).json(error);
-
-//     res.json({ success: true });
-//   }
-// );
-
-// router.put('/:id', auth, upload.single('image'), async (req, res) => {
-//   const { id } = req.params;
-//   const {
-//     name,
-//     description,
-//     url,
-//     tutorial_video,
-//     category,
-//   } = req.body;
-
-//   let imageUrl = null;
-
-//   if (req.file) {
-//     const filePath = `tools/${Date.now()}-${req.file.originalname}`;
-
-//     const { error: uploadError } = await supabase.storage
-//       .from('tool-images')
-//       .upload(filePath, req.file.buffer, {
-//         contentType: req.file.mimetype,
-//         upsert: true,
-//       });
-
-//     if (uploadError) {
-//       return res.status(500).json(uploadError);
-//     }
-
-//     imageUrl = supabase.storage
-//       .from('tool-images')
-//       .getPublicUrl(filePath).data.publicUrl;
-//   }
-
-//   const updatePayload = {
-//     name,
-//     description,
-//     url,
-//     tutorial_video,
-//     category,
-//   };
-
-//   // only overwrite image if a new one is uploaded
-//   if (imageUrl) {
-//     updatePayload.image = imageUrl;
-//     updatePayload.image_light = imageUrl;
-//     updatePayload.image_dark = imageUrl;
-//   }
-
-//   const { error } = await supabase
-//     .from('tools')
-//     .update(updatePayload)
-//     .eq('id', id);
-
-//   if (error) return res.status(500).json(error);
-
-//   res.json({ success: true });
-// });
-
-// router.delete('/:id', auth, async (req, res) => {
-//   const { id } = req.params;
-
-//   const { error } = await supabase
-//     .from('tools')
-//     .delete()
-//     .eq('id', id);
-
-//   if (error) return res.status(500).json(error);
-//   res.json({ success: true });
-// });
-
-// module.exports = router;
-
 const express = require('express');
-const { supabase } = require('../lib/supabase');
-const auth   = require('../middlewares/auth');
-const cache  = require('../services/cache');
-const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+const db      = require('../lib/db');
+const auth    = require('../middlewares/auth');
+const cache   = require('../services/cache');
+const multer  = require('multer');
+const path    = require('path');
+const fs      = require('fs');
+
 const router = express.Router();
 
-// GET /api/tools
+// ── Setup upload folder
+const uploadDir = path.join(__dirname, '../uploads/tools');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: uploadDir,
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
+
+// ── GET /api/tools
 router.get('/', async (req, res) => {
-  const cached = cache.getTools();
-  if (cached) return res.json(cached);
+  try {
+    const cached = cache.getTools();
+    if (cached) return res.json(cached);
 
-  const { data, error } = await supabase
-    .from('tools')
-    .select('id,name,description,url,category,image,image_light,image_dark,tutorial_video,created_at')
-    .order('created_at', { ascending: false });
+    const { rows } = await db.query(`
+      SELECT id, name, description, url, category,
+             image, image_light, image_dark,
+             tutorial_video, created_at
+      FROM tools
+      ORDER BY created_at DESC
+    `);
 
-  if (error) return res.status(500).json(error);
+    cache.setTools(rows);
+    res.json(rows);
 
-  cache.setTools(data);
-  res.json(data);
+  } catch (err) {
+    console.error('Fetch tools error:', err);
+    res.status(500).json({ error: 'Failed to fetch tools' });
+  }
 });
 
-// POST /api/tools
+// ── POST /api/tools
 router.post('/', auth, upload.single('image'), async (req, res) => {
-  const { name, description, url, category, tutorial_video } = req.body;
+  try {
+    const { name, description, url, category, tutorial_video } = req.body;
 
-  if (!name || !url || !category)
-    return res.status(400).json({ error: 'Missing required fields' });
+    if (!name || !url || !category) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
-  let imageUrl = null;
-  if (req.file) {
-    const filePath = `tools/${Date.now()}-${req.file.originalname}`;
-    const { error: uploadError } = await supabase.storage
-      .from('tool-images')
-      .upload(filePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-    if (uploadError) return res.status(500).json(uploadError);
-    imageUrl = supabase.storage.from('tool-images').getPublicUrl(filePath).data.publicUrl;
+    let imageUrl = null;
+
+    if (req.file) {
+      imageUrl = `/uploads/tools/${req.file.filename}`;
+    }
+
+    await db.query(
+      `
+      INSERT INTO tools
+      (name, description, url, category, tutorial_video,
+       image, image_light, image_dark, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `,
+      [
+        name,
+        description,
+        url,
+        category,
+        tutorial_video,
+        imageUrl,
+        imageUrl,
+        imageUrl,
+        req.user.email
+      ]
+    );
+
+    cache.delTools();
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Insert tool error:', err);
+    res.status(500).json({ error: 'Failed to insert tool' });
   }
-
-  const { error } = await supabase.from('tools').insert({
-    name, description, url, category, tutorial_video,
-    image: imageUrl, image_light: imageUrl, image_dark: imageUrl,
-    created_by: req.user.email,
-  });
-
-  if (error) return res.status(500).json(error);
-
-  cache.delTools();
-  res.json({ success: true });
 });
 
-// PUT /api/tools/:id
+// ── PUT /api/tools/:id
 router.put('/:id', auth, upload.single('image'), async (req, res) => {
-  const { id } = req.params;
-  const { name, description, url, tutorial_video, category } = req.body;
+  try {
+    const { id } = req.params;
+    const { name, description, url, tutorial_video, category } = req.body;
 
-  let imageUrl = null;
-  if (req.file) {
-    const filePath = `tools/${Date.now()}-${req.file.originalname}`;
-    const { error: uploadError } = await supabase.storage
-      .from('tool-images')
-      .upload(filePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-    if (uploadError) return res.status(500).json(uploadError);
-    imageUrl = supabase.storage.from('tool-images').getPublicUrl(filePath).data.publicUrl;
+    let imageUrl = null;
+
+    if (req.file) {
+      imageUrl = `/uploads/tools/${req.file.filename}`;
+    }
+
+    let updateQuery = `
+      UPDATE tools
+      SET name=$1, description=$2, url=$3,
+          tutorial_video=$4, category=$5
+    `;
+    let values = [name, description, url, tutorial_video, category];
+    let index = 6;
+
+    if (imageUrl) {
+      updateQuery += `,
+        image=$${index},
+        image_light=$${index},
+        image_dark=$${index}
+      `;
+      values.push(imageUrl);
+      index++;
+    }
+
+    updateQuery += ` WHERE id=$${index}`;
+    values.push(id);
+
+    await db.query(updateQuery, values);
+
+    cache.delTools();
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Update tool error:', err);
+    res.status(500).json({ error: 'Failed to update tool' });
   }
-
-  const updatePayload = { name, description, url, tutorial_video, category };
-  if (imageUrl) {
-    updatePayload.image = imageUrl;
-    updatePayload.image_light = imageUrl;
-    updatePayload.image_dark = imageUrl;
-  }
-
-  const { error } = await supabase.from('tools').update(updatePayload).eq('id', id);
-  if (error) return res.status(500).json(error);
-
-  cache.delTools();
-  res.json({ success: true });
 });
 
-// DELETE /api/tools/:id
+// ── DELETE /api/tools/:id
 router.delete('/:id', auth, async (req, res) => {
-  const { error } = await supabase.from('tools').delete().eq('id', req.params.id);
-  if (error) return res.status(500).json(error);
+  try {
+    await db.query(
+      `DELETE FROM tools WHERE id=$1`,
+      [req.params.id]
+    );
 
-  cache.delTools();
-  res.json({ success: true });
+    cache.delTools();
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Delete tool error:', err);
+    res.status(500).json({ error: 'Failed to delete tool' });
+  }
 });
 
 module.exports = router;

@@ -144,6 +144,7 @@ app.use(cors({
 app.use(passport.initialize());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/profile',       require('./routes/profile'));
