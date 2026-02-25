@@ -1,8 +1,8 @@
 const NodeCache = require('node-cache');
 
-const shortCache  = new NodeCache({ stdTTL: 900   }); // 15 min
-const mediumCache = new NodeCache({ stdTTL: 1800  }); // 30 min
-const longCache   = new NodeCache({ stdTTL: 3600  }); // 1 hour
+const shortCache  = new NodeCache({ stdTTL: 60   }); // 1 min
+const mediumCache = new NodeCache({ stdTTL: 300  }); // 5 min
+const longCache   = new NodeCache({ stdTTL: 1800  }); // 30 min
 
 const cacheService = {
   // Tasks (short TTL, per-user)
