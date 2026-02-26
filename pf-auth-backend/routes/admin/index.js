@@ -1,34 +1,59 @@
 const express = require('express');
 const router  = express.Router();
 const auth    = require('../../middlewares/auth');
+const db      = require('../../lib/db');
 
-// ── Admin guard — rejects non-admins before any route runs ───────────────────
+// ── Admin guard — rejects non-admins before any route runs ─────────────
 const adminOnly = async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-  // Check against admin_assignments table — NOT profiles.role
-  const { supabase } = require('../../lib/supabase');
-  const { data } = await supabase
-    .from('admin_assignments')
-    .select('role_id')
-    .eq('user_email', req.user.email)
-    .eq('is_active', true)
-    .single();
+    // 1️⃣ Get active assignment
+    const { rows: assignments } = await db.query(
+      `SELECT role_id
+       FROM admin_assignments
+       WHERE user_email = $1
+       AND is_active = true
+       LIMIT 1`,
+      [req.user.email]
+    );
 
-  // Get role name
-  const { data: role } = await supabase
-    .from('roles')
-    .select('name')
-    .eq('id', data?.role_id)
-    .single();
+    if (!assignments.length) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
-  if (role?.name !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-  next();
+    const roleId = assignments[0].role_id;
+
+    // 2️⃣ Get role name
+    const { rows: roles } = await db.query(
+      `SELECT name
+       FROM roles
+       WHERE id = $1
+       LIMIT 1`,
+      [roleId]
+    );
+
+    if (!roles.length || roles[0].name !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    next();
+
+  } catch (err) {
+    console.error('Admin guard crash:', err);
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 };
 
-router.use(auth);         // verify JWT first
-router.use(adminOnly);    // then check admin role
 
+// ── Apply Middlewares ───────────────────────────────────────────────────
+router.use(auth);
+router.use(adminOnly);
+
+
+// ── Admin Routes ────────────────────────────────────────────────────────
 router.use('/me',          require('./me'));
 router.use('/roles',       require('./roles'));
 router.use('/departments', require('./departments'));
