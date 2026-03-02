@@ -8,16 +8,17 @@ router.patch('/update-role', auth, async (req, res) => {
   try {
     // 🔐 ADMIN CHECK (better than req.user.role)
     const { rows: adminCheck } = await db.query(
-      `SELECT r.name
-       FROM admin_assignments aa
-       JOIN roles r ON r.id = aa.role_id
-       WHERE aa.user_email = $1
-       AND aa.is_active = true
-       LIMIT 1`,
+      `
+      SELECT is_admin
+      FROM admin_assignments
+      WHERE user_email = $1
+      AND is_active = true
+      LIMIT 1
+      `,
       [req.user.email]
     );
 
-    if (!adminCheck.length || adminCheck[0].name !== 'admin') {
+    if (!adminCheck.length || !adminCheck[0].is_admin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
