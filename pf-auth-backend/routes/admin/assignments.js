@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
          ORDER BY name ASC`
       ),
       db.query(
-        `SELECT user_email, role_id, department_id
+        `SELECT user_email, role_id, department_id, is_admin
          FROM admin_assignments
          WHERE is_active = true`
       )
@@ -76,7 +76,8 @@ router.patch('/', async (req, res) => {
         email,
         role_id || null,
         department_id || null,
-        req.user.email
+        is_admin ?? false,          // ✅ THIS WAS MISSING
+        req.user.email 
       ]
     );
 
