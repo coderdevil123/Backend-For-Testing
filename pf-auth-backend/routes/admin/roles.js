@@ -16,9 +16,9 @@ router.get('/', async (req, res) => {
     }
 
     const { rows } = await db.query(
-      `SELECT id, name, description
+      `SELECT id, name, description, position
        FROM roles
-       ORDER BY name ASC`
+       ORDER BY position ASC, name ASC`
     );
 
     cache.setRoles(rows);
@@ -33,16 +33,16 @@ router.get('/', async (req, res) => {
 // ── POST /api/admin/roles ────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, position } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Role name is required' });
     }
 
     await db.query(
-      `INSERT INTO roles (name, description)
-       VALUES ($1, $2)`,
-      [name.trim(), description?.trim() || null]
+      `INSERT INTO roles (name, description, position)
+       VALUES ($1, $2, $3)`,
+      [name.trim(), description?.trim() || null, position || 999]
     );
 
     cache.delRoles();

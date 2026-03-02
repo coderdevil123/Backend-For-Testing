@@ -17,7 +17,7 @@ async function buildTeamResult() {
         FROM admin_assignments
         WHERE is_active = true
       `),
-      db.query(`SELECT id, name FROM roles`),
+      db.query(`SELECT id, name, position FROM roles ORDER BY position ASC`),
       db.query(`SELECT id, name FROM departments`)
     ]);
 
