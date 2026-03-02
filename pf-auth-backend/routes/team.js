@@ -87,7 +87,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const email = req.user.email;
 
-    // Try team cache first
+    // ── 1️⃣ Try team cache first (optimized path) ─────────────
     const team = cache.getTeam();
     if (team) {
       const me = team.find(m => m.email === email);
@@ -95,12 +95,13 @@ router.get('/me', auth, async (req, res) => {
         return res.json({
           email: me.email,
           role: me.role,
-          department: me.department
+          department: me.department,
+          is_admin: me.is_admin || false
         });
       }
     }
 
-    // Fetch profile + assignment
+    // ── 2️⃣ Cache miss → fetch profile + assignment ───────────
     const [profileRes, assignRes] = await Promise.all([
       db.query(
         `SELECT email, role, department
@@ -109,7 +110,7 @@ router.get('/me', auth, async (req, res) => {
         [email]
       ),
       db.query(
-        `SELECT role_id, department_id
+        `SELECT role_id, department_id, is_admin
          FROM admin_assignments
          WHERE user_email = $1
          AND is_active = true`,
@@ -123,10 +124,13 @@ router.get('/me', auth, async (req, res) => {
 
     let role       = profileRes.rows[0].role       || 'member';
     let department = profileRes.rows[0].department || 'general';
+    let is_admin   = false;
 
     const assignment = assignRes.rows[0];
 
     if (assignment) {
+      is_admin = assignment.is_admin || false;
+
       const [roleRes, deptRes] = await Promise.all([
         assignment.role_id
           ? db.query('SELECT name FROM roles WHERE id = $1', [assignment.role_id])
@@ -140,47 +144,7 @@ router.get('/me', auth, async (req, res) => {
       if (deptRes.rows[0]?.name)  department = deptRes.rows[0].name;
     }
 
-    res.json({ email, role, department });
-    // ── Check team cache first (has enriched roles) ──────────────────────────
-    const team = cache.getTeam();
-    if (team) {
-      const me = team.find(m => m.email === req.user.email);
-      if (me) return res.json({ email: me.email, role: me.role, department: me.department });
-    }
-
-    // ── Cache miss: fetch profile + assignment in parallel ───────────────────
-    const [profileRes, assignRes] = await Promise.all([
-      supabase.from('profiles')
-        .select('email,role,department')
-        .eq('email', req.user.email)
-        .single(),
-      supabase.from('admin_assignments')
-        .select('role_id,department_id')
-        .eq('user_email', req.user.email)
-        .eq('is_active', true)
-        .maybeSingle(),
-    ]);
-
-    if (profileRes.error) return res.status(500).json({ error: 'Profile not found' });
-
-    let role       = profileRes.data?.role       || 'member';
-    let department = profileRes.data?.department || 'general';
-
-    // ── If assignment exists, resolve actual role/dept names from IDs ────────
-    if (assignRes.data) {
-      const [roleRes, deptRes] = await Promise.all([
-        assignRes.data.role_id
-          ? supabase.from('roles').select('name').eq('id', assignRes.data.role_id).single()
-          : Promise.resolve({ data: null }),
-        assignRes.data.department_id
-          ? supabase.from('departments').select('name').eq('id', assignRes.data.department_id).single()
-          : Promise.resolve({ data: null }),
-      ]);
-      if (roleRes.data?.name)  role       = roleRes.data.name;
-      if (deptRes.data?.name)  department = deptRes.data.name;
-    }
-
-    res.json({ email: req.user.email, role, department });
+    return res.json({ email, role, department, is_admin });
 
   } catch (err) {
     console.error('/me error:', err);
