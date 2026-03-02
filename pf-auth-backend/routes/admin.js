@@ -28,7 +28,7 @@ router.patch('/update-role', auth, async (req, res) => {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
-    const ALLOWED_ROLES = ['admin', 'team_lead', 'intern', 'member'];
+    const ALLOWED_ROLES = ['team_lead', 'intern', 'member'];
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
