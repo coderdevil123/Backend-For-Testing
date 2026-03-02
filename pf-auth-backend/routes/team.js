@@ -141,6 +141,46 @@ router.get('/me', auth, async (req, res) => {
     }
 
     res.json({ email, role, department });
+    // ── Check team cache first (has enriched roles) ──────────────────────────
+    const team = cache.getTeam();
+    if (team) {
+      const me = team.find(m => m.email === req.user.email);
+      if (me) return res.json({ email: me.email, role: me.role, department: me.department });
+    }
+
+    // ── Cache miss: fetch profile + assignment in parallel ───────────────────
+    const [profileRes, assignRes] = await Promise.all([
+      supabase.from('profiles')
+        .select('email,role,department')
+        .eq('email', req.user.email)
+        .single(),
+      supabase.from('admin_assignments')
+        .select('role_id,department_id')
+        .eq('user_email', req.user.email)
+        .eq('is_active', true)
+        .maybeSingle(),
+    ]);
+
+    if (profileRes.error) return res.status(500).json({ error: 'Profile not found' });
+
+    let role       = profileRes.data?.role       || 'member';
+    let department = profileRes.data?.department || 'general';
+
+    // ── If assignment exists, resolve actual role/dept names from IDs ────────
+    if (assignRes.data) {
+      const [roleRes, deptRes] = await Promise.all([
+        assignRes.data.role_id
+          ? supabase.from('roles').select('name').eq('id', assignRes.data.role_id).single()
+          : Promise.resolve({ data: null }),
+        assignRes.data.department_id
+          ? supabase.from('departments').select('name').eq('id', assignRes.data.department_id).single()
+          : Promise.resolve({ data: null }),
+      ]);
+      if (roleRes.data?.name)  role       = roleRes.data.name;
+      if (deptRes.data?.name)  department = deptRes.data.name;
+    }
+
+    res.json({ email: req.user.email, role, department });
 
   } catch (err) {
     console.error('/me error:', err);
