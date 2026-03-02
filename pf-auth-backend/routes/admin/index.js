@@ -10,32 +10,18 @@ const adminOnly = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 1️⃣ Get active assignment
-    const { rows: assignments } = await db.query(
-      `SELECT role_id
-       FROM admin_assignments
-       WHERE user_email = $1
-       AND is_active = true
-       LIMIT 1`,
+    const { rows } = await db.query(
+      `
+      SELECT is_admin
+      FROM admin_assignments
+      WHERE user_email = $1
+      AND is_active = true
+      LIMIT 1
+      `,
       [req.user.email]
     );
 
-    if (!assignments.length) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    const roleId = assignments[0].role_id;
-
-    // 2️⃣ Get role name
-    const { rows: roles } = await db.query(
-      `SELECT name
-       FROM roles
-       WHERE id = $1
-       LIMIT 1`,
-      [roleId]
-    );
-
-    if (!roles.length || roles[0].name !== 'admin') {
+    if (!rows.length || !rows[0].is_admin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
