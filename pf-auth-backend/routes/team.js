@@ -13,7 +13,7 @@ async function buildTeamResult() {
         ORDER BY name ASC
       `),
       db.query(`
-        SELECT user_email, role_id, department_id
+        SELECT user_email, role_id, department_id, is_admin
         FROM admin_assignments
         WHERE is_active = true
       `),
@@ -37,10 +37,15 @@ async function buildTeamResult() {
 
   return profiles.map(p => {
     const a = assignMap.get(p.email);
+    const roleId = a?.role_id;
+    const roleObj = roles.find(r => r.id === roleId);
+
     return {
       ...p,
-      role:       a?.role_id       ? roleMap.get(a.role_id)       : p.role       || 'member',
+      role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
       department: a?.department_id ? deptMap.get(a.department_id) : p.department || 'general',
+      is_admin: a?.is_admin || false,
+      role_position: roles.find(r => r.id === a?.role_id)?.position ?? 999
     };
   });
 }

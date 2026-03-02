@@ -35,8 +35,9 @@ router.get('/', async (req, res) => {
     const result = profiles.map(p => ({
       email: p.email,
       name:  p.name,
-      role_id:       map.get(p.email)?.role_id       ?? null,
+      role_id: map.get(p.email)?.role_id ?? null,
       department_id: map.get(p.email)?.department_id ?? null,
+      is_admin: map.get(p.email)?.is_admin ?? false,
     }));
 
     cache.setAssignments(result);
@@ -52,7 +53,7 @@ router.get('/', async (req, res) => {
 // ── PATCH /api/admin/assignments ─────────────────────────────────────
 router.patch('/', async (req, res) => {
   try {
-    const { email, role_id, department_id } = req.body;
+    const { email, role_id, department_id, is_admin } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -61,12 +62,13 @@ router.patch('/', async (req, res) => {
     await db.query(
       `
       INSERT INTO admin_assignments
-        (user_email, role_id, department_id, assigned_by, is_active)
-      VALUES ($1, $2, $3, $4, true)
+      (user_email, role_id, department_id, is_admin, assigned_by, is_active)
+      VALUES ($1, $2, $3, $4, $5, true)
       ON CONFLICT (user_email)
       DO UPDATE SET
         role_id       = EXCLUDED.role_id,
         department_id = EXCLUDED.department_id,
+        is_admin      = EXCLUDED.is_admin,
         assigned_by   = EXCLUDED.assigned_by,
         is_active     = true
       `,
