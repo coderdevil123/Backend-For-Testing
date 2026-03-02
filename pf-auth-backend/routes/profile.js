@@ -137,7 +137,8 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
     await db.query(
       `UPDATE profiles 
        SET voice_sample_url=$1,
-           voice_sample_uploaded_at=$2
+           voice_sample_uploaded_at=$2,
+           status=TRUE
        WHERE email=$3`,
       [voicePath, now, email]
     );
@@ -171,7 +172,8 @@ router.delete('/voice', auth, async (req, res) => {
     await db.query(
       `UPDATE profiles 
        SET voice_sample_url=NULL,
-           voice_sample_uploaded_at=NULL
+           voice_sample_uploaded_at=NULL,
+           status=FALSE
        WHERE email=$1`,
       [email]
     );
