@@ -148,9 +148,9 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
 
     // 🔹 STEP 2 — Send to enrollment service
     const form = new FormData();
-    form.append('audiofile', fs.createReadStream(file.path));
+    form.append('audio', fs.createReadStream(file.path));
     form.append('email', email);
-    form.append('username', name);
+    form.append('user_name', name);
 
     try {
       const enrollmentResponse = await axios.post(
@@ -169,7 +169,10 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
       );
 
     } catch (externalError) {
-      console.error("Enrollment API failed:", externalError.response?.data || externalError.message);
+      console.error("Enrollment API failed:");
+      console.error("Status:", externalError.response?.status);
+      console.error("Data:", externalError.response?.data);
+      console.error("Message:", externalError.message);
 
       // Already FALSE, no need to change again
       return res.status(500).json({
