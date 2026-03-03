@@ -7,7 +7,8 @@ const router  = express.Router();
 const auth    = require('../middlewares/auth');
 const axios   = require('axios');
 const FormData = require('form-data');
-const { v4: uuidv4 } = require('uuid');
+// const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 //setup of voice recorder
 const voiceDir = path.join(__dirname, '../uploads/voice');
@@ -37,7 +38,7 @@ const storage = multer.diskStorage({
   destination: avatarDir,
   filename: (req, file, cb) => {
     const ext = file.originalname.split('.').pop();
-    const uniqueName = `${req.user.email}-${uuidv4()}.${ext}`;
+    const uniqueName = `${req.user.email}-${crypto.randomUUID()}.${ext}`;
     cb(null, uniqueName);
   }
 });
