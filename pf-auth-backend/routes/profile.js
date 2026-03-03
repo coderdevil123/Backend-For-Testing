@@ -175,8 +175,21 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
       console.error("Message:", externalError.message);
 
       // Already FALSE, no need to change again
+      // Create announcement entry
+      await db.query(
+        `
+        INSERT INTO announcements (title, content, category, created_at)
+        VALUES ($1,$2,$3,NOW())
+        `,
+        [
+          'Voice Verification Failed',
+          `Voice enrollment failed for ${email}. Reason: ${externalError.response?.data?.detail || externalError.message}`,
+          'Security'
+        ]
+      );
+
       return res.status(500).json({
-        error: 'Voice saved locally but enrollment failed'
+        error: externalError.response?.data?.detail || 'Voice enrollment failed'
       });
     }
 
