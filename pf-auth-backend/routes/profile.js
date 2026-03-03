@@ -5,6 +5,8 @@ const path    = require('path');
 const fs      = require('fs');
 const router  = express.Router();
 const auth    = require('../middlewares/auth');
+const axios   = require('axios');
+const FormData = require('form-data');
 
 //setup of voice recorder
 const voiceDir = path.join(__dirname, '../uploads/voice');
@@ -124,7 +126,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
 /* ── POST /api/profile/voice */
 router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
   try {
-    const { email } = req.user;
+    const { email, name } = req.user;
     const file = req.file;
 
     if (!file) {
@@ -134,14 +136,46 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
     const voicePath = `/uploads/voice/${file.filename}`;
     const now = new Date();
 
+    // 🔹 STEP 1 — Save locally and mark NOT verified yet
     await db.query(
       `UPDATE profiles 
        SET voice_sample_url=$1,
            voice_sample_uploaded_at=$2,
-           status=TRUE
+           status=FALSE
        WHERE email=$3`,
       [voicePath, now, email]
     );
+
+    // 🔹 STEP 2 — Send to enrollment service
+    const form = new FormData();
+    form.append('audiofile', fs.createReadStream(file.path));
+    form.append('email', email);
+    form.append('username', name);
+
+    try {
+      const enrollmentResponse = await axios.post(
+        'http://10.10.10.7:8000/api/enroll/voice',
+        form,
+        {
+          headers: form.getHeaders(),
+          timeout: 15000,
+        }
+      );
+
+      // 🔥 Only now mark verified
+      await db.query(
+        `UPDATE profiles SET status=TRUE WHERE email=$1`,
+        [email]
+      );
+
+    } catch (externalError) {
+      console.error("Enrollment API failed:", externalError.response?.data || externalError.message);
+
+      // Already FALSE, no need to change again
+      return res.status(500).json({
+        error: 'Voice saved locally but enrollment failed'
+      });
+    }
 
     res.json({
       voice_sample_url: voicePath,
