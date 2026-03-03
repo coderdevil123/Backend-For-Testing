@@ -7,6 +7,7 @@ const router  = express.Router();
 const auth    = require('../middlewares/auth');
 const axios   = require('axios');
 const FormData = require('form-data');
+const { v4: uuidv4 } = require('uuid');
 
 //setup of voice recorder
 const voiceDir = path.join(__dirname, '../uploads/voice');
@@ -35,9 +36,9 @@ if (!fs.existsSync(avatarDir)) {
 const storage = multer.diskStorage({
   destination: avatarDir,
   filename: (req, file, cb) => {
-    const email = req.user.email;
     const ext = file.originalname.split('.').pop();
-    cb(null, `${email}.${ext}`);
+    const uniqueName = `${req.user.email}-${uuidv4()}.${ext}`;
+    cb(null, uniqueName);
   }
 });
 
@@ -108,6 +109,20 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // 🔥 STEP 1: Get old avatar path from DB
+    const { rows } = await db.query(
+      `SELECT avatar_url FROM profiles WHERE email=$1`,
+      [email]
+    );
+
+    if (rows[0]?.avatar_url) {
+      const oldPath = path.join(__dirname, '..', rows[0].avatar_url);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // 🔥 STEP 2: Save new path
     const avatarPath = `/uploads/avatars/${file.filename}`;
 
     await db.query(
