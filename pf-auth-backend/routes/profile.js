@@ -9,6 +9,7 @@ const axios   = require('axios');
 const FormData = require('form-data');
 // const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const cache = require('../services/cache');
 
 //setup of voice recorder
 const voiceDir = path.join(__dirname, '../uploads/voice');
@@ -115,13 +116,15 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       `SELECT avatar_url FROM profiles WHERE email=$1`,
       [email]
     );
-
+    
     if (rows[0]?.avatar_url) {
       const oldPath = path.join(__dirname, '..', rows[0].avatar_url);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
       }
     }
+    
+    cache.delTeam();
 
     // 🔥 STEP 2: Save new path
     const avatarPath = `/uploads/avatars/${file.filename}`;
