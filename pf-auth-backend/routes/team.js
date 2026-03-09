@@ -119,7 +119,12 @@ router.get('/me', auth, async (req, res) => {
     ]);
 
     if (!profileRes.rows.length) {
-      return res.status(500).json({ error: 'Profile not found' });
+      return res.json({
+        email,
+        role: 'member',
+        department: 'general',
+        is_admin: false
+      });
     }
 
     let role       = profileRes.rows[0].role       || 'member';

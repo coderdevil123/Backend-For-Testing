@@ -49,15 +49,30 @@ const upload = multer({ storage });
 /* ── GET /api/profile */
 router.get('/', auth, async (req, res) => {
   try {
-    const { email } = req.user;
+    const { email, name } = req.user;
 
-    const { rows } = await db.query(
+    let { rows } = await db.query(
       `SELECT * FROM profiles WHERE email = $1`,
       [email]
     );
 
+    // 🟢 FIRST LOGIN → create profile automatically
     if (!rows.length) {
-      return res.status(500).json({ error: 'Profile not found' });
+
+      const displayName =
+        name ||
+        email.split('@')[0];
+
+      const { rows: created } = await db.query(
+        `
+        INSERT INTO profiles (email, name, role, department)
+        VALUES ($1,$2,'member','general')
+        RETURNING *
+        `,
+        [email, displayName]
+      );
+
+      return res.json(created[0]);
     }
 
     res.json(rows[0]);
