@@ -5,6 +5,7 @@ const jwt      = require('jsonwebtoken');
 const cors     = require('cors');
 const { supabase } = require('./lib/supabase');
 const app = express();
+const path = require('path');
 
 const ALLOWED_ORIGINS = [
   'https://pf-workspace.vercel.app',
@@ -23,7 +24,10 @@ app.use(cors({
 app.use(passport.initialize());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static('uploads'));
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'))
+);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/profile',       require('./routes/profile'));
