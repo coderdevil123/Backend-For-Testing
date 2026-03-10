@@ -8,6 +8,29 @@ const fs      = require('fs');
 
 const router = express.Router();
 
+const requireAdmin = async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `
+      SELECT is_admin
+      FROM admin_assignments
+      WHERE user_email=$1 AND is_active=true
+      `,
+      [req.user.email]
+    );
+
+    if (!rows[0]?.is_admin) {
+      return res.status(403).json({ error: 'Admin only action' });
+    }
+
+    next();
+
+  } catch (err) {
+    console.error('Admin check failed:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // ── Setup upload folder
 const uploadDir = path.join(__dirname, '../uploads/tools');
 if (!fs.existsSync(uploadDir)) {
@@ -48,7 +71,7 @@ router.get('/', async (req, res) => {
 });
 
 // ── POST /api/tools
-router.post('/', auth, upload.single('image'), async (req, res) => {
+router.post('/', auth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const { name, description, url, category, tutorial_video } = req.body;
 
@@ -92,7 +115,7 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
 });
 
 // ── PUT /api/tools/:id
-router.put('/:id', auth, upload.single('image'), async (req, res) => {
+router.put('/:id', auth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, url, tutorial_video, category } = req.body;
@@ -136,7 +159,7 @@ router.put('/:id', auth, upload.single('image'), async (req, res) => {
 });
 
 // ── DELETE /api/tools/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, requireAdmin, async (req, res) => {
   try {
     await db.query(
       `DELETE FROM tools WHERE id=$1`,
