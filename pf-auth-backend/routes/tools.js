@@ -8,28 +8,28 @@ const fs      = require('fs');
 
 const router = express.Router();
 
-const requireAdmin = async (req, res, next) => {
-  try {
-    const { rows } = await db.query(
-      `
-      SELECT is_admin
-      FROM admin_assignments
-      WHERE user_email=$1 AND is_active=true
-      `,
-      [req.user.email]
-    );
+// const requireAdmin = async (req, res, next) => {
+//   try {
+//     const { rows } = await db.query(
+//       `
+//       SELECT is_admin
+//       FROM admin_assignments
+//       WHERE user_email=$1 AND is_active=true
+//       `,
+//       [req.user.email]
+//     );
 
-    if (!rows[0]?.is_admin) {
-      return res.status(403).json({ error: 'Admin only action' });
-    }
+//     if (!rows[0]?.is_admin) {
+//       return res.status(403).json({ error: 'Admin only action' });
+//     }
 
-    next();
+//     next();
 
-  } catch (err) {
-    console.error('Admin check failed:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+//   } catch (err) {
+//     console.error('Admin check failed:', err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// };
 
 // ── Setup upload folder
 const uploadDir = path.join(__dirname, '../uploads/tools');
