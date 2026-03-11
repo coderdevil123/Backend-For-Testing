@@ -66,6 +66,49 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ── PATCH /api/admin/roles/reorder ─────────────────────────────
+router.patch('/reorder', async (req, res) => {
+  try {
+    const { roles } = req.body;
+
+    if (!Array.isArray(roles)) {
+      return res.status(400).json({ error: "Invalid roles payload" });
+    }
+
+    const client = await db.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      for (const role of roles) {
+        await client.query(
+          `UPDATE roles
+           SET position = $1
+           WHERE id = $2`,
+          [role.position, role.id]
+        );
+      }
+
+      await client.query("COMMIT");
+
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Reorder roles error:", err);
+    res.status(500).json({ error: "Failed to reorder roles" });
+  }
+});
+
 router.patch('/:id', async (req, res) => {
   try {
     const { name, description, position } = req.body;
@@ -156,49 +199,6 @@ router.delete('/:id', async (req, res) => {
   } catch (err) {
     console.error('Delete role error:', err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ── PATCH /api/admin/roles/reorder ─────────────────────────────
-router.patch('/reorder', async (req, res) => {
-  try {
-    const { roles } = req.body;
-
-    if (!Array.isArray(roles)) {
-      return res.status(400).json({ error: "Invalid roles payload" });
-    }
-
-    const client = await db.connect();
-
-    try {
-      await client.query("BEGIN");
-
-      for (const role of roles) {
-        await client.query(
-          `UPDATE roles
-           SET position = $1
-           WHERE id = $2`,
-          [role.position, role.id]
-        );
-      }
-
-      await client.query("COMMIT");
-
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    cache.delRoles();
-    cache.delTeam();
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error("Reorder roles error:", err);
-    res.status(500).json({ error: "Failed to reorder roles" });
   }
 });
 
