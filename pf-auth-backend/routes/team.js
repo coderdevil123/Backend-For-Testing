@@ -41,13 +41,22 @@ async function buildTeamResult() {
     const roleId = a?.role_id;
     const roleObj = roles.find(r => r.id === roleId);
 
+    const roleName = a?.role_id
+      ? roleMap.get(a.role_id)
+      : p.role || 'member';
+
+    const rolePosition =
+      roles.find(r => r.id === a?.role_id)?.position ??
+      roles.find(r => r.name === roleName)?.position ??
+      999;
+
     return {
       ...p,
-      role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
+      role: roleName,
       department: a?.department_id ? deptMap.get(a.department_id) : p.department || 'general',
       is_admin: a?.is_admin || false,
-      is_visible: a?.is_visible || true,
-      role_position: roles.find(r => r.id === a?.role_id)?.position ?? 999
+      is_visible: a?.is_visible ?? true,
+      role_position: rolePosition
     };
   }).filter(member => member.is_visible !== false);
 }
