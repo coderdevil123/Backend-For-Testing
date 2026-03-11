@@ -66,6 +66,39 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.patch('/:id', async (req, res) => {
+  try {
+    const { name, description, position } = req.body;
+
+    const existing = await db.query(
+      `SELECT id FROM roles WHERE position=$1 AND id != $2`,
+      [position, req.params.id]
+    );
+
+    if (existing.rows.length) {
+      return res.status(400).json({
+        error: "This rank is already given to another role"
+      });
+    }
+
+    await db.query(
+      `UPDATE roles
+       SET name=$1, description=$2, position=$3
+       WHERE id=$4`,
+      [name, description || null, position || 999, req.params.id]
+    );
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Update role error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── PUT /api/admin/roles/:id ───────────────────────────
 router.put('/:id', async (req, res) => {
   try {
