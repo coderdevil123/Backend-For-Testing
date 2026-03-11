@@ -49,7 +49,7 @@ async function buildTeamResult() {
       is_visible: a?.is_visible || true,
       role_position: roles.find(r => r.id === a?.role_id)?.position ?? 999
     };
-  });
+  }).filter(member => member.is_visible !== false);
 }
 
 // ── GET /api/team
