@@ -63,8 +63,8 @@ router.patch('/', async (req, res) => {
     await db.query(
       `
       INSERT INTO admin_assignments
-      (user_email, role_id, department_id, is_admin, assigned_by, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
+      (user_email, role_id, department_id, is_admin, is_visible, assigned_by, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
       ON CONFLICT (user_email)
       DO UPDATE SET
         role_id       = EXCLUDED.role_id,
