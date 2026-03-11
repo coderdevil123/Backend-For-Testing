@@ -13,9 +13,10 @@ async function buildTeamResult() {
         ORDER BY name ASC
       `),
       db.query(`
-        SELECT user_email, role_id, department_id, is_admin
+        SELECT user_email, role_id, department_id, is_admin, is_visible
         FROM admin_assignments
         WHERE is_active = true
+        AND (is_visible = true OR is_visible IS NULL)
       `),
       db.query(`SELECT id, name, position FROM roles ORDER BY position ASC`),
       db.query(`SELECT id, name FROM departments`)
@@ -45,6 +46,7 @@ async function buildTeamResult() {
       role: a?.role_id ? roleMap.get(a.role_id) : p.role || 'member',
       department: a?.department_id ? deptMap.get(a.department_id) : p.department || 'general',
       is_admin: a?.is_admin || false,
+      is_visible: a?.is_visible || true,
       role_position: roles.find(r => r.id === a?.role_id)?.position ?? 999
     };
   });

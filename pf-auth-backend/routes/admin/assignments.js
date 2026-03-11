@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
          ORDER BY name ASC`
       ),
       db.query(
-        `SELECT user_email, role_id, department_id, is_admin
+        `SELECT user_email, role_id, department_id, is_admin, is_visible
          FROM admin_assignments
          WHERE is_active = true`
       )
@@ -38,6 +38,7 @@ router.get('/', async (req, res) => {
       role_id: map.get(p.email)?.role_id ?? null,
       department_id: map.get(p.email)?.department_id ?? null,
       is_admin: map.get(p.email)?.is_admin ?? false,
+      is_visible: map.get(p.email)?.is_visible ?? true,
     }));
 
     cache.setAssignments(result);
@@ -53,7 +54,7 @@ router.get('/', async (req, res) => {
 // ── PATCH /api/admin/assignments ─────────────────────────────────────
 router.patch('/', async (req, res) => {
   try {
-    const { email, role_id, department_id, is_admin } = req.body;
+    const { email, role_id, department_id, is_admin, is_visible } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -69,6 +70,7 @@ router.patch('/', async (req, res) => {
         role_id       = EXCLUDED.role_id,
         department_id = EXCLUDED.department_id,
         is_admin      = EXCLUDED.is_admin,
+        is_visible    = EXCLUDED.is_visible,
         assigned_by   = EXCLUDED.assigned_by,
         is_active     = true
       `,
@@ -76,7 +78,8 @@ router.patch('/', async (req, res) => {
         email,
         role_id || null,
         department_id || null,
-        is_admin ?? false,          // ✅ THIS WAS MISSING
+        is_admin ?? false,          
+        is_visible ?? true,         
         req.user.email 
       ]
     );

@@ -34,6 +34,16 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, description, position } = req.body;
+    const existing = await db.query(
+      `SELECT id FROM roles WHERE position = $1`,
+      [position]
+      );
+
+      if (existing.rows.length) {
+        return res.status(400).json({
+          error: "This rank is already given to another role"
+        });
+    }
 
     if (!name) {
       return res.status(400).json({ error: 'Role name is required' });
