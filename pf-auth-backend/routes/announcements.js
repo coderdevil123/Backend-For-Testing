@@ -67,11 +67,13 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'Tagged emails required' });
     }
 
-    await db.query(
+    // ADDED: RETURNING * so we can send the created object back to the frontend
+    const { rows } = await db.query(
       `
       INSERT INTO announcements
       (title, content, category, recipients, tagged_emails, related_task_id, created_by, created_by_name)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING *
       `,
       [
         title,
@@ -85,11 +87,20 @@ router.post('/', auth, async (req, res) => {
       ]
     );
 
+    const newAnnouncement = rows[0];
+
+    // FIX: Always clear the cache for the person who created it so their screen updates
+    cache.delAnnouncements(req.user.email);
+    
     if (recipients === 'specific' && Array.isArray(tagged_emails)) {
       tagged_emails.forEach(email => cache.delAnnouncements(email));
+    } else if (recipients === 'all') {
+      // If your cache service supports clearing everything, it would be good to call it here
+      // e.g., if (cache.flushAll) cache.flushAll();
     }
 
-    res.status(201).json({ success: true });
+    // Send the new announcement data back so the frontend code we updated earlier can use it
+    res.status(201).json({ success: true, data: newAnnouncement });
 
   } catch (err) {
     console.error('Announcement insert error:', err);
