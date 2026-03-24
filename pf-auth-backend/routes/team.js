@@ -16,7 +16,7 @@ async function buildTeamResult() {
         SELECT user_email, role_id, department_id, is_admin, is_visible
         FROM admin_assignments
         WHERE is_active = true
-        AND (is_visible = true OR is_visible IS NULL)
+        -- ✅ Removed the faulty AND clause here so we can catch hidden users
       `),
       db.query(`SELECT id, name, position FROM roles ORDER BY position ASC`),
       db.query(`SELECT id, name FROM departments`)
@@ -55,10 +55,10 @@ async function buildTeamResult() {
       role: roleName,
       department: a?.department_id ? deptMap.get(a.department_id) : p.department || 'general',
       is_admin: a?.is_admin || false,
-      is_visible: a?.is_visible ?? true,
+      is_visible: a?.is_visible ?? true, // ✅ Will now correctly read "false" from the database
       role_position: rolePosition
     };
-  }).filter(member => member.is_visible !== false);
+  }).filter(member => member.is_visible !== false); // ✅ Successfully filters them out before sending to frontend
 }
 
 // ── GET /api/team
