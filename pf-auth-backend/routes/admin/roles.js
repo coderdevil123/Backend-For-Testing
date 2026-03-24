@@ -71,37 +71,38 @@ router.patch('/reorder', async (req, res) => {
   try {
     const { roles } = req.body;
 
-    if (!Array.isArray(roles)) {
+    if (!Array.isArray(roles) || roles.length === 0) {
       return res.status(400).json({ error: "Invalid roles payload" });
     }
 
-    const client = await db.connect();
+    // Build a single atomic UPDATE query using a CASE statement.
+    // This updates all positions simultaneously, avoiding UNIQUE constraint collisions.
+    let query = `UPDATE roles SET position = CASE id `;
+    const values = [];
+    const ids = [];
 
-    try {
-      await client.query("BEGIN");
+    roles.forEach((role, index) => {
+      // Push ID and Position into the values array
+      values.push(role.id, role.position);
+      
+      const idPlaceholder = `$${index * 2 + 1}`;
+      const posPlaceholder = `$${index * 2 + 2}`;
+      
+      // Construct the CASE logic: WHEN id = $1 THEN $2
+      query += `WHEN ${idPlaceholder} THEN ${posPlaceholder}::int `;
+      ids.push(idPlaceholder);
+    });
 
-      for (const role of roles) {
-        await client.query(
-          `UPDATE roles
-           SET position = $1
-           WHERE id = $2`,
-          [role.position, role.id]
-        );
-      }
+    query += `END WHERE id IN (${ids.join(', ')})`;
 
-      await client.query("COMMIT");
+    // Execute the single query
+    await db.query(query, values);
 
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-
+    // Clear caches so the frontend gets the fresh order on reload
     cache.delRoles();
     cache.delTeam();
 
-    res.json({ success: true });
+    res.json({ success: true, message: "Roles reordered successfully" });
 
   } catch (err) {
     console.error("Reorder roles error:", err);
