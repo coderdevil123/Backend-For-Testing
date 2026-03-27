@@ -184,7 +184,8 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
     const form = new FormData();
     form.append('audio', fs.createReadStream(file.path));
     form.append('email', email);
-    form.append('user_name', name);
+    // ✅ FIX: Fallback just in case 'name' is undefined so it doesn't break FormData
+    form.append('user_name', name || email.split('@')[0]); 
 
     try {
       const enrollmentResponse = await axios.post(
@@ -192,7 +193,7 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
         form,
         {
           headers: form.getHeaders(),
-          timeout: 15000,
+          timeout: 15000, // 15 seconds limit
         }
       );
 
@@ -203,27 +204,33 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
       );
 
     } catch (externalError) {
-      console.error("Enrollment API failed:");
-      console.error("Status:", externalError.response?.status);
-      console.error("Data:", externalError.response?.data);
-      console.error("Message:", externalError.message);
+      console.error("Enrollment API failed:", externalError.message);
 
-      // Already FALSE, no need to change again
-      // Create announcement entry
-      await db.query(
-        `
-        INSERT INTO announcements (title, content, category, created_at)
-        VALUES ($1,$2,$3,NOW())
-        `,
-        [
-          'Voice Verification Failed',
-          `Voice enrollment failed for ${email}. Reason: ${externalError.response?.data?.detail || externalError.message}`,
-          'Security'
-        ]
-      );
+      // ✅ FIX: Added missing required columns (recipients, tagged_emails, created_by)
+      // to prevent the database from throwing a NOT NULL constraint error and crashing.
+      try {
+        await db.query(
+          `
+          INSERT INTO announcements 
+          (title, content, category, recipients, tagged_emails, created_by, created_by_name, created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+          `,
+          [
+            'Voice Verification Failed',
+            `Voice enrollment failed for ${email}. Reason: ${externalError.response?.data?.detail || externalError.message}`,
+            'Security',
+            'specific',
+            [email], // Tag the user so they get the notification
+            'system',
+            'System'
+          ]
+        );
+      } catch (dbErr) {
+        console.error("Failed to log announcement:", dbErr.message);
+      }
 
       return res.status(500).json({
-        error: externalError.response?.data?.detail || 'Voice enrollment failed'
+        error: externalError.response?.data?.detail || 'Verification timed out or model is offline.'
       });
     }
 
@@ -234,7 +241,7 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
 
   } catch (err) {
     console.error('Voice upload error:', err);
-    res.status(500).json({ error: 'Voice upload failed' });
+    res.status(500).json({ error: 'Voice upload failed entirely' });
   }
 });
 
