@@ -189,7 +189,7 @@ router.post('/voice', auth, uploadVoice.single('voice'), async (req, res) => {
 
     try {
       const enrollmentResponse = await axios.post(
-        'http://10.10.10.7:8000/api/enroll/voice',
+        'http://10.10.10.7:8000/api/enroll/voice/',
         form,
         {
           headers: form.getHeaders(),
