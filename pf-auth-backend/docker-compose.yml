@@ -9,6 +9,10 @@ services:
       - .env
     expose:
       - "3000"
+    volumes:
+    - ./uploads:/app/uploads
+    depends_on:
+      - postgres 
     networks:
       - pf-shared-network  # Changed from backend-network
 
@@ -24,6 +28,19 @@ services:
       - pf-auth-backend
     networks:
       - pf-shared-network  # Changed from backend-network
+
+  postgres:   
+    image: tensorchord/pgvecto-rs:pg16-v0.3.0
+    container_name: pf-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pf
+      POSTGRES_PASSWORD: pf
+      POSTGRES_DB: pf
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - pf-shared-network
 
 networks:
   pf-shared-network:

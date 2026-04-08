@@ -1,137 +1,77 @@
-// const express = require('express');
-// const { supabase } = require('../../lib/supabase');
-// const auth = require('../../middlewares/auth');
-// const cache = require('../../services/cache');
-
-// const router = express.Router();
-
-// router.get('/', async (req, res) => {
-//   const cached = cache.get('departments');
-//   if (cached) return res.json(cached);
-
-//   const { data, error } = await supabase
-//     .from('departments')
-//     .select('*')
-//     .order('name');
-
-//   if (error) return res.status(500).json(error);
-
-//   cache.set('departments', data);
-//   res.json(data);
-// });
-
-// router.post('/', auth, async (req, res) => {
-//   const { name } = req.body;
-
-//   if (!name) {
-//     return res.status(400).json({ error: 'Missing department name' });
-//   }
-
-//   const { error } = await supabase.from('departments').insert({
-//     name,
-//     created_by: req.user.email,
-//   });
-
-//   if (error) return res.status(500).json(error);
-//   res.json({ success: true });
-// });
-
-// router.delete('/:id', auth, async (req, res) => {
-//   const { error } = await supabase
-//     .from('departments')
-//     .delete()
-//     .eq('id', req.params.id);
-
-//   if (error) return res.status(500).json(error);
-//   res.json({ success: true });
-// });
-
-// module.exports = router;
-
-// // const express = require('express');
-// // const { supabase } = require('../../lib/supabase');
-// // const auth = require('../../middlewares/auth'); // ✅ ADD THIS
-
-// // const router = express.Router();
-
-// // router.get('/', auth, async (req, res) => {
-// //   const { data, error } = await supabase
-// //     .from('departments')
-// //     .select('*')
-// //     .order('name');
-
-// //   if (error) return res.status(500).json(error);
-// //   res.json(data);
-// // });
-
-// // router.post('/', auth, async (req, res) => {  // ✅ ADD auth
-// //   const { name } = req.body;
-
-// //   if (!name) {
-// //     return res.status(400).json({ error: 'Missing department name' });
-// //   }
-
-// //   const { error } = await supabase.from('departments').insert({
-// //     name
-// //   });
-
-// //   if (error) return res.status(500).json(error);
-// //   res.json({ success: true });
-// // });
-
-
-
-// // module.exports = router;
-
-
 const express = require('express');
-const { supabase } = require('../../lib/supabase');
-const auth = require('../../middlewares/auth');
-const cache = require('../../services/cache');
-const router = express.Router();
+const db      = require('../../lib/db');
+const auth    = require('../../middlewares/auth');
+const cache   = require('../../services/cache');
+const router  = express.Router();
 
+
+// ── GET /api/admin/departments ───────────────────────────────────────
 router.get('/', async (req, res) => {
-  const cached = cache.getDepartments();
-  if (cached) return res.json(cached);
+  try {
+    const cached = cache.getDepartments();
+    if (cached) return res.json(cached);
 
-  const { data, error } = await supabase
-    .from('departments')
-    .select('*')
-    .order('name');
+    const { rows } = await db.query(
+      `SELECT id, name
+       FROM departments
+       ORDER BY name ASC`
+    );
 
-  if (error) return res.status(500).json(error);
+    cache.setDepartments(rows);
+    res.json(rows);
 
-  cache.setDepartments(data);
-  res.json(data);
+  } catch (err) {
+    console.error('GET departments error:', err);
+    res.status(500).json({ error: 'Failed to load departments' });
+  }
 });
 
+
+// ── POST /api/admin/departments ──────────────────────────────────────
 router.post('/', auth, async (req, res) => {
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'Missing department name' });
+  try {
+    const { name } = req.body;
 
-  const { error } = await supabase.from('departments').insert({
-    name,
-    created_by: req.user.email,
-  });
+    if (!name) {
+      return res.status(400).json({ error: 'Missing department name' });
+    }
 
-  if (error) return res.status(500).json(error);
+    await db.query(
+      `INSERT INTO departments (name)
+       VALUES ($1)`,
+      [name.trim()]
+    );
 
-  cache.delDepartments();
-  cache.delTeam();
-  res.json({ success: true });
+    cache.delDepartments();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('POST department error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
+
+// ── DELETE /api/admin/departments/:id ─────────────────────────────────
 router.delete('/:id', auth, async (req, res) => {
-  const { error } = await supabase
-    .from('departments')
-    .delete()
-    .eq('id', req.params.id);
+  try {
+    await db.query(
+      `DELETE FROM departments
+       WHERE id = $1`,
+      [req.params.id]
+    );
 
-  if (error) return res.status(500).json(error);
+    cache.delDepartments();
+    cache.delTeam();
 
-  cache.delDepartments();
-  cache.delTeam();
-  res.json({ success: true });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('DELETE department error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

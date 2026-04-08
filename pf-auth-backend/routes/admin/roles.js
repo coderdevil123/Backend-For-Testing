@@ -1,110 +1,206 @@
-// const express = require('express');
-// const { supabase } = require('../../lib/supabase');
-// const cache = require('../../services/cache');
+const express  = require('express');
+const db       = require('../../lib/db');
+const cache    = require('../../services/cache');
+const router   = express.Router();
 
-// const router = express.Router();
-
-// // GET all roles
-// router.get('/', async (req, res) => {
-//   const cached = cache.get('roles');
-//   if (cached) return res.json(cached);
-
-//   const { data, error } = await supabase
-//     .from('roles')
-//     .select('*')
-//     .order('name');
-
-//   if (error) return res.status(500).json({ error: 'Failed to fetch roles' });
-
-//   cache.set('roles', data);
-//   res.json(data);
-// });
-
-// // CREATE role
-// router.post('/', async (req, res) => {
-//   const { name, description } = req.body;
-
-//   if (!name) {
-//     return res.status(400).json({ error: 'Role name is required' });
-//   }
-
-//   const { error } = await supabase
-//     .from('roles')
-//     .insert({
-//       name,
-//       description: description || null,
-//     });
-
-//   if (error) {
-//     console.error(error);
-//     return res.status(500).json({ error: 'Failed to create role' });
-//   }
-
-//   res.json({ success: true });
-// });
-
-// // DELETE role
-// router.delete('/:id', async (req, res) => {
-//   const { id } = req.params;
-
-//   const { error } = await supabase
-//     .from('roles')
-//     .delete()
-//     .eq('id', id);
-
-//   if (error) {
-//     console.error(error);
-//     return res.status(500).json({ error: 'Failed to delete role' });
-//   }
-
-//   res.json({ success: true });
-// });
-
-// module.exports = router;
-
-const express = require('express');
-const { supabase } = require('../../lib/supabase');
-const cache = require('../../services/cache');
-const router = express.Router();
-
+// ── GET /api/admin/roles ─────────────────────────────────────────────
 router.get('/', async (req, res) => {
-  const cached = cache.getRoles();
-  if (cached) return res.json(cached);
+  try {
+    const cached = cache.getRoles();
 
-  const { data, error } = await supabase
-    .from('roles')
-    .select('*')
-    .order('name');
+    // Bust cache if descriptions missing
+    if (cached) {
+      const hasMissingDesc = cached.every(r => r.description === undefined);
+      if (!hasMissingDesc) return res.json(cached);
+      cache.delRoles();
+    }
 
-  if (error) return res.status(500).json({ error: 'Failed to fetch roles' });
+    const { rows } = await db.query(
+      `SELECT id, name, description, position
+       FROM roles
+       ORDER BY position ASC, name ASC`
+    );
 
-  cache.setRoles(data);
-  res.json(data);
+    cache.setRoles(rows);
+    res.json(rows);
+
+  } catch (err) {
+    console.error('GET roles error:', err);
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
 });
 
+// ── POST /api/admin/roles ────────────────────────────────────────────
 router.post('/', async (req, res) => {
-  const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: 'Role name is required' });
+  try {
+    const { name, description, position } = req.body;
+    const existing = await db.query(
+      `SELECT id FROM roles WHERE position = $1`,
+      [position]
+      );
 
-  const { error } = await supabase.from('roles').insert({
-    name,
-    description: description || null,
-  });
+      if (existing.rows.length) {
+        return res.status(400).json({
+          error: "This rank is already given to another role"
+        });
+    }
 
-  if (error) return res.status(500).json({ error: 'Failed to create role' });
+    if (!name) {
+      return res.status(400).json({ error: 'Role name is required' });
+    }
 
-  cache.delRoles();
-  cache.delTeam(); // team data includes role names
-  res.json({ success: true });
+    await db.query(
+      `INSERT INTO roles (name, description, position)
+       VALUES ($1, $2, $3)`,
+      [name.trim(), description?.trim() || null, position || 999]
+    );
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Insert role error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.delete('/:id', async (req, res) => {
-  const { error } = await supabase.from('roles').delete().eq('id', req.params.id);
-  if (error) return res.status(500).json({ error: 'Failed to delete role' });
+// ── PATCH /api/admin/roles/reorder ─────────────────────────────
+router.patch('/reorder', async (req, res) => {
+  try {
+    const { roles } = req.body;
 
-  cache.delRoles();
-  cache.delTeam();
-  res.json({ success: true });
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return res.status(400).json({ error: "Invalid roles payload" });
+    }
+
+    // Build a single atomic UPDATE query using a CASE statement.
+    // This updates all positions simultaneously, avoiding UNIQUE constraint collisions.
+    let query = `UPDATE roles SET position = CASE id `;
+    const values = [];
+    const ids = [];
+
+    roles.forEach((role, index) => {
+      // Push ID and Position into the values array
+      values.push(role.id, role.position);
+      
+      const idPlaceholder = `$${index * 2 + 1}`;
+      const posPlaceholder = `$${index * 2 + 2}`;
+      
+      // Construct the CASE logic: WHEN id = $1 THEN $2
+      query += `WHEN ${idPlaceholder} THEN ${posPlaceholder}::int `;
+      ids.push(idPlaceholder);
+    });
+
+    query += `END WHERE id IN (${ids.join(', ')})`;
+
+    // Execute the single query
+    await db.query(query, values);
+
+    // Clear caches so the frontend gets the fresh order on reload
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true, message: "Roles reordered successfully" });
+
+  } catch (err) {
+    console.error("Reorder roles error:", err);
+    res.status(500).json({ error: "Failed to reorder roles" });
+  }
+});
+
+router.patch('/:id', async (req, res) => {
+  try {
+    const { name, description, position } = req.body;
+
+    const existing = await db.query(
+      `SELECT id FROM roles WHERE position=$1 AND id != $2`,
+      [position, req.params.id]
+    );
+
+    if (existing.rows.length) {
+      return res.status(400).json({
+        error: "This rank is already given to another role"
+      });
+    }
+
+    await db.query(
+      `UPDATE roles
+       SET name=$1, description=$2, position=$3
+       WHERE id=$4`,
+      [name, description || null, position || 999, req.params.id]
+    );
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Update role error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /api/admin/roles/:id ───────────────────────────
+router.put('/:id', async (req, res) => {
+  try {
+    const { name, description, position } = req.body;
+
+    const existing = await db.query(
+      `SELECT id FROM roles
+       WHERE position = $1
+       AND id != $2`,
+      [position, req.params.id]
+    );
+
+    if (existing.rows.length) {
+      return res.status(400).json({
+        error: "This rank is already given to another role"
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE roles
+      SET name = $1,
+          description = $2,
+          position = $3
+      WHERE id = $4
+      `,
+      [name, description, position, req.params.id]
+    );
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Update role error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DELETE /api/admin/roles/:id ───────────────────────────────────────
+router.delete('/:id', async (req, res) => {
+  try {
+    await db.query(
+      `DELETE FROM roles
+       WHERE id = $1`,
+      [req.params.id]
+    );
+
+    cache.delRoles();
+    cache.delTeam();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Delete role error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
